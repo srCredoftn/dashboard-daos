@@ -5,6 +5,7 @@ import type { Dao } from "@shared/dao";
 
 let useInMemory = false;
 let connectionAttempted = false;
+const FORCE_DB_ONLY = (process.env.FORCE_DB_ONLY || "false").toLowerCase() === "true" || process.env.FORCE_DB_ONLY === "1";
 // Monotonic per-year sequence tracker to avoid reusing numbers after deletions
 const lastIssuedSeqByYear: Record<string, number> = {};
 
@@ -16,6 +17,10 @@ async function tryConnect(): Promise<boolean> {
     useInMemory = false;
     return true;
   } catch (e) {
+    if (FORCE_DB_ONLY) {
+      console.error("❌ MongoDB connection failed and FORCE_DB_ONLY is set.", e);
+      throw e;
+    }
     console.warn("⚠️ MongoDB not available, falling back to in-memory storage");
     useInMemory = true;
     return false;
@@ -40,6 +45,7 @@ export class DaoService {
       const daos = await DaoModel.find().sort({ updatedAt: -1 });
       return daos.map((dao) => dao.toObject());
     } catch (e) {
+      if (FORCE_DB_ONLY) throw e;
       console.warn("⚠️ DB error in getAllDaos, switching to in-memory fallback:", String(e));
       useInMemory = true;
       return daoStorage
@@ -62,6 +68,7 @@ export class DaoService {
       const doc = await DaoModel.findOne().sort({ createdAt: -1 });
       return doc ? (doc.toObject() as Dao) : null;
     } catch (e) {
+      if (FORCE_DB_ONLY) throw e;
       console.warn("⚠️ DB error in getLastCreatedDao, using in-memory fallback:", String(e));
       useInMemory = true;
       const list = daoStorage.getAll().slice();
@@ -210,6 +217,7 @@ export class DaoService {
         .limit(pageSize);
       return { items: docs.map((d: any) => d.toObject()), total };
     } catch (e) {
+      if (FORCE_DB_ONLY) throw e;
       console.warn("⚠️ DB error in getDaos, using in-memory fallback:", String(e));
       useInMemory = true;
       return this.getDaos({ search, autorite, dateFrom, dateTo, sort, order, page, pageSize });
@@ -233,6 +241,7 @@ export class DaoService {
       const dao = await DaoModel.findOne({ id });
       return dao ? dao.toObject() : null;
     } catch (e) {
+      if (FORCE_DB_ONLY) throw e;
       console.warn("⚠️ DB error in getDaoById, using in-memory fallback:", String(e));
       useInMemory = true;
       return daoStorage.findById(id) || null;
@@ -373,6 +382,7 @@ export class DaoService {
           numeroListe = await this.generateNextDaoNumber();
           continue;
         }
+        if (FORCE_DB_ONLY) throw e;
         console.warn("⚠️ DB error in createDao, using in-memory fallback:", msg);
         useInMemory = true;
         const newDao: Dao = {
@@ -425,6 +435,7 @@ export class DaoService {
       );
       return updatedDao ? updatedDao.toObject() : null;
     } catch (e) {
+      if (FORCE_DB_ONLY) throw e;
       console.warn("⚠️ DB error in updateDao, using in-memory fallback:", String(e));
       useInMemory = true;
       const index = daoStorage.findIndexById(id);
@@ -488,6 +499,7 @@ export class DaoService {
       }
       return result.deletedCount > 0;
     } catch (e) {
+      if (FORCE_DB_ONLY) throw e;
       console.warn("⚠️ DB error in deleteDao, using in-memory fallback:", String(e));
       useInMemory = true;
       const existing = daoStorage.findById(id);
@@ -535,6 +547,7 @@ export class DaoService {
       delete lastIssuedSeqByYear[k];
 
     if (useInMemory) {
+      if (FORCE_DB_ONLY) return; // nothing to clear in fallback when DB-only is enforced
       daoStorage.clearAll(false);
       return;
     }
