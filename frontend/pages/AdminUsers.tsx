@@ -122,7 +122,16 @@ export default function AdminUsers() {
       await loadUsers();
     } catch (error) {
       console.error("Error creating user:", error);
-      alert("Erreur lors de la création de l'utilisateur");
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes("User already exists")) {
+        alert("Un utilisateur avec cet email existe déjà");
+      } else if (msg.includes("User name already taken")) {
+        alert("Ce nom est déjà utilisé par un autre utilisateur");
+      } else if (msg.toLowerCase().includes("validation") || msg.includes("VALIDATION_ERROR")) {
+        alert("Veuillez renseigner le nom, l'email et le rôle");
+      } else {
+        alert("Erreur lors de la création de l'utilisateur");
+      }
     } finally {
       setIsCreating(false);
     }
