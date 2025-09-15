@@ -235,6 +235,7 @@ class AuthApiService {
       name: string;
       email: string;
       role: string;
+      password?: string;
     },
     opts?: { idempotencyKey?: string },
   ): Promise<User> {
