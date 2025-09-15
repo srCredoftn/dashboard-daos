@@ -23,28 +23,21 @@ function writeEnv(filePath, lines) {
 }
 
 const rootEnv = join(process.cwd(), ".env");
-const mongoEnv = join(process.cwd(), "backend-mongodb/.env");
 
 const jwt1 = genSecret();
-const jwt2 = genSecret();
 
 writeEnv(rootEnv, [
   `PORT=3001`,
   `FRONTEND_URL=http://localhost:8080`,
   `PING_MESSAGE=pong - secure`,
+  `MONGODB_URI=mongodb://localhost:27017/dao-management`,
   `JWT_SECRET=${jwt1}`,
   `JWT_EXPIRES_IN=24h`,
+  `FORCE_DB_ONLY=1`,
+  `MONGODB_FAST_FAIL=1`,
   `SEED_DAOS=false`,
   `SEED_USERS=false`,
   `ADMIN_EMAIL=admin@exemple.com`,
   `ADMIN_PASSWORD=superpass`,
   `TOKEN_BOOT_ID=${genSecret(12)}`,
-]);
-
-writeEnv(mongoEnv, [
-  `PORT=5000`,
-  `FRONTEND_URL=http://localhost:8080`,
-  `MONGODB_URI=mongodb://localhost:27017/dao-management`,
-  `JWT_SECRET=${jwt2}`,
-  `JWT_EXPIRES_IN=7d`,
 ]);
