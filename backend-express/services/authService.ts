@@ -839,7 +839,13 @@ export class AuthService {
   }
 }
 
-AuthService.initialize().catch(console.error);
+AuthService.initialize().catch((e) => {
+  devLog.error("Auth initialization error", e);
+  if (process.env.FORCE_DB_ONLY === undefined || process.env.FORCE_DB_ONLY === "1" || String(process.env.FORCE_DB_ONLY).toLowerCase() === "true") {
+    // Fail fast in DB-only default mode so issues are visible
+    throw e;
+  }
+});
 
 if (process.env.NODE_ENV === "development") {
   setInterval(() => {
