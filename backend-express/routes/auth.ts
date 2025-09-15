@@ -218,7 +218,8 @@ router.post("/users", authenticate, requireAdmin, async (req, res) => {
     return res.status(201).json(newUser);
   } catch (error) {
     devLog.error("Create user error:", error);
-    return res.status(500).json({ error: "Failed to create user", code: "CREATE_USER_FAILED" });
+    const msg = (error as any)?.message;
+    return res.status(500).json({ error: msg || "Failed to create user", code: "CREATE_USER_FAILED" });
   }
 });
 
