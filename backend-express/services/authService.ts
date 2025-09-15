@@ -555,25 +555,47 @@ export class AuthService {
       }
 
       const existingUser = await UserModel.findOne({
-        email: userData.email.toLowerCase(),
-      }).exec();
-      if (existingUser) {
-        throw new Error("User already exists");
+      email: userData.email.toLowerCase(),
+    }).exec();
+    if (existingUser) {
+      if (!existingUser.isActive) {
+        // Reactivate existing inactive account with new credentials and role
+        const defaultPassword = userData.password || "changeme123";
+        existingUser.name = normalizedName;
+        existingUser.role = userData.role;
+        existingUser.isActive = true;
+        existingUser.isSuperAdmin = userData.role === "admin";
+        existingUser.passwordHash = await bcrypt.hash(defaultPassword, 12);
+        await existingUser.save();
+        devLog.info(`👤 User reactivated: ${existingUser.email} Role: ${existingUser.role}`);
+        if (existingUser.role === "admin") await refreshSuperAdminCache();
+        return {
+          id: existingUser.id,
+          name: existingUser.name,
+          email: existingUser.email,
+          role: existingUser.role,
+          createdAt: existingUser.createdAt,
+          isActive: existingUser.isActive,
+          lastLogin: existingUser.lastLogin,
+          isSuperAdmin: existingUser.isSuperAdmin,
+        };
       }
+      throw new Error("User already exists");
+    }
 
-      const defaultPassword = userData.password || "changeme123";
-      const passwordHash = await bcrypt.hash(defaultPassword, 12);
+    const defaultPassword = userData.password || "changeme123";
+    const passwordHash = await bcrypt.hash(defaultPassword, 12);
 
-      const doc = await UserModel.create({
-        id: new mongoose.Types.ObjectId().toHexString(),
-        name: normalizedName,
-        email: userData.email.toLowerCase(),
-        role: userData.role,
-        createdAt: new Date().toISOString(),
-        isActive: true,
-        passwordHash,
-        isSuperAdmin: userData.role === "admin",
-      });
+    const doc = await UserModel.create({
+      id: new mongoose.Types.ObjectId().toHexString(),
+      name: normalizedName,
+      email: userData.email.toLowerCase(),
+      role: userData.role,
+      createdAt: new Date().toISOString(),
+      isActive: true,
+      passwordHash,
+      isSuperAdmin: userData.role === "admin",
+    });
 
       devLog.info(`👤 New user created: ${doc.email} Role: ${doc.role}`);
       if (doc.role === "admin") await refreshSuperAdminCache();
