@@ -162,6 +162,18 @@ export function createServer(): express.Application {
     });
   });
 
+  // DB health
+  app.get("/api/health/db", async (_req, res) => {
+    try {
+      const { connectToDatabase } = await import("./config/database");
+      const conn = await connectToDatabase();
+      const state = conn.readyState; // 1 connected
+      res.json({ ok: state === 1, state });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: (e as Error).message });
+    }
+  });
+
   // Boot info endpoint used by frontend to invalidate stale local storage between deployments
   app.get("/api/boot", (_req, res) => {
     const shouldSeed =
