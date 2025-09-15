@@ -13,9 +13,13 @@ import mongoose from "mongoose";
 import UserModel, { type UserDocument } from "../models/User";
 
 const JWT_SECRET = process.env.JWT_SECRET;
-const FORCE_DB_ONLY = (process.env.FORCE_DB_ONLY || "false").toLowerCase() === "true" || process.env.FORCE_DB_ONLY === "1";
+const FORCE_DB_ONLY = (() => {
+  const v = process.env.FORCE_DB_ONLY;
+  if (!v) return true; // default: DB-only mode
+  return v === "1" || v.toLowerCase() === "true";
+})();
 const DEV_FALLBACK_ENABLED =
-  !FORCE_DB_ONLY && ((process.env.ALLOW_DEV_AUTH_FALLBACK || "true").toLowerCase() ===
+  !FORCE_DB_ONLY && ((process.env.ALLOW_DEV_AUTH_FALLBACK || "false").toLowerCase() ===
     "true" && process.env.NODE_ENV !== "production");
 
 // In-memory fallback users for development when MongoDB is unavailable
