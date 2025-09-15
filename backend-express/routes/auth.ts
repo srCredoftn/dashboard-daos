@@ -163,15 +163,29 @@ router.post("/users", authenticate, requireAdmin, async (req, res) => {
     if (!userData.name || !userData.email || !userData.role) {
       return res
         .status(400)
-        .json({ error: "Name, email, and role are required" });
+        .json({ error: "Name, email, and role are required", code: "VALIDATION_ERROR" });
     }
 
-    const newUser = await AuthService.createUser({
-      name: userData.name,
-      email: userData.email,
-      role: userData.role,
-      password: userData.password, // Pass the password to the service
-    });
+    let newUser;
+    try {
+      newUser = await AuthService.createUser({
+        name: userData.name,
+        email: userData.email,
+        role: userData.role,
+        password: userData.password, // Pass the password to the service
+      });
+    } catch (e: any) {
+      const msg = (e?.message || "").toString();
+      // Map known business errors to 400-level responses
+      if (msg.includes("User already exists") || msg.toLowerCase().includes("duplicate key") || (e && (e as any).code === 11000)) {
+        return res.status(400).json({ error: "User already exists", code: "USER_EXISTS" });
+      }
+      if (msg.includes("User name already taken")) {
+        return res.status(400).json({ error: "User name already taken", code: "NAME_TAKEN" });
+      }
+      // Unknown error -> rethrow to outer catch
+      throw e;
+    }
 
     if (idempKey) setIdempotency(idempKey, newUser);
 
@@ -204,7 +218,7 @@ router.post("/users", authenticate, requireAdmin, async (req, res) => {
     return res.status(201).json(newUser);
   } catch (error) {
     devLog.error("Create user error:", error);
-    return res.status(500).json({ error: "Failed to create user" });
+    return res.status(500).json({ error: "Failed to create user", code: "CREATE_USER_FAILED" });
   }
 });
 
