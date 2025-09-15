@@ -5,7 +5,11 @@ import type { Dao } from "@shared/dao";
 
 let useInMemory = false;
 let connectionAttempted = false;
-const FORCE_DB_ONLY = (process.env.FORCE_DB_ONLY || "false").toLowerCase() === "true" || process.env.FORCE_DB_ONLY === "1";
+const FORCE_DB_ONLY = (() => {
+  const v = process.env.FORCE_DB_ONLY;
+  if (!v) return true; // default: DB-only mode
+  return v === "1" || v.toLowerCase() === "true";
+})();
 // Monotonic per-year sequence tracker to avoid reusing numbers after deletions
 const lastIssuedSeqByYear: Record<string, number> = {};
 
