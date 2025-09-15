@@ -13,6 +13,48 @@ import mongoose from "mongoose";
 import UserModel, { type UserDocument } from "../models/User";
 
 const JWT_SECRET = process.env.JWT_SECRET;
+const DEV_FALLBACK_ENABLED =
+  ((process.env.ALLOW_DEV_AUTH_FALLBACK || "true").toLowerCase() ===
+    "true" && process.env.NODE_ENV !== "production");
+
+// In-memory fallback users for development when MongoDB is unavailable
+const fallbackUsers: Array<{
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  passwordHash: string;
+  createdAt: string;
+  lastLogin?: string;
+  isActive: boolean;
+  isSuperAdmin?: boolean;
+}> = [];
+
+function seedFallbackUsers() {
+  if (!DEV_FALLBACK_ENABLED) return;
+  if (fallbackUsers.length > 0) return;
+  const now = new Date().toISOString();
+  const demo = [
+    { name: "Admin User", email: "admin@2snd.fr", role: "admin" as UserRole, password: "admin123" },
+    { name: "Marie Dubois", email: "marie.dubois@2snd.fr", role: "user" as UserRole, password: "marie123" },
+    { name: "Pierre Martin", email: "pierre.martin@2snd.fr", role: "user" as UserRole, password: "pierre123" },
+  ];
+  for (const u of demo) {
+    const id = new mongoose.Types.ObjectId().toHexString();
+    const passwordHash = bcrypt.hashSync(u.password, 10);
+    fallbackUsers.push({
+      id,
+      name: u.name,
+      email: u.email.toLowerCase(),
+      role: u.role,
+      passwordHash,
+      createdAt: now,
+      isActive: true,
+      isSuperAdmin: u.role === "admin",
+    });
+  }
+}
+seedFallbackUsers();
 
 let superAdminIdCache: string | null = null;
 async function refreshSuperAdminCache() {
@@ -148,6 +190,15 @@ async function ensureInitialUsers() {
     return;
   }
 
+  if (DEV_FALLBACK_ENABLED) {
+    const admin = fallbackUsers.find((u) => u.isSuperAdmin);
+    if (admin) {
+      superAdminIdCache = admin.id;
+      devLog.info("🔐 Dev auth fallback active with in-memory admin user");
+      return;
+    }
+  }
+
   devLog.warn(
     "⚠️ No initial users created. Set ADMIN_EMAIL + ADMIN_PASSWORD to create an admin on startup or run with SEED_USERS=true for development.",
   );
@@ -168,9 +219,9 @@ export class AuthService {
   static async login(
     credentials: LoginCredentials,
   ): Promise<AuthResponse | null> {
+    const email = credentials.email.toLowerCase();
     try {
       await connectToDatabase();
-      const email = credentials.email.toLowerCase();
       const user = await UserModel.findOne({ email, isActive: true }).exec();
       if (!user) {
         authLog.login(credentials.email, false);
@@ -207,6 +258,37 @@ export class AuthService {
       authLog.login(user.email, true);
       return { user: authUser, token };
     } catch (error) {
+      if (DEV_FALLBACK_ENABLED) {
+        const u = fallbackUsers.find((x) => x.email === email && x.isActive);
+        if (!u) {
+          authLog.login(credentials.email, false);
+          return null;
+        }
+        const ok = await bcrypt.compare(credentials.password, u.passwordHash);
+        if (!ok) {
+          authLog.login(credentials.email, false);
+          return null;
+        }
+        const authUser: AuthUser = {
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          role: u.role,
+        };
+        const token = jwt.sign(
+          authUser,
+          JWT_SECRET as jwt.Secret,
+          {
+            expiresIn: JWT_EXPIRES_IN as any,
+            issuer: "dao-management",
+            audience: "dao-app",
+          } as any,
+        );
+        activeSessions.add(token);
+        u.lastLogin = new Date().toISOString();
+        authLog.login(u.email, true);
+        return { user: authUser, token };
+      }
       devLog.error("Login error:", error);
       return null;
     }
@@ -219,20 +301,32 @@ export class AuthService {
         audience: "dao-app",
       }) as AuthUser;
 
-      await connectToDatabase();
-      const user = await UserModel.findOne({
-        id: decoded.id,
-        isActive: true,
-      }).exec();
-      if (!user) {
+      try {
+        await connectToDatabase();
+        const user = await UserModel.findOne({
+          id: decoded.id,
+          isActive: true,
+        }).exec();
+        if (!user) {
+          activeSessions.delete(token);
+          return null;
+        }
+        if (!activeSessions.has(token)) activeSessions.add(token);
+        authLog.tokenVerification(user.email, true);
+        return decoded;
+      } catch (dbErr) {
+        if (DEV_FALLBACK_ENABLED) {
+          const u = fallbackUsers.find((x) => x.id === decoded.id && x.isActive);
+          if (u) {
+            if (!activeSessions.has(token)) activeSessions.add(token);
+            authLog.tokenVerification(u.email, true);
+            return decoded;
+          }
+        }
         activeSessions.delete(token);
         return null;
       }
-
-      if (!activeSessions.has(token)) activeSessions.add(token);
-      authLog.tokenVerification(user.email, true);
-      return decoded;
-    } catch (error) {
+    } catch (_) {
       activeSessions.delete(token);
       return null;
     }
@@ -296,51 +390,105 @@ export class AuthService {
   }
 
   static async getAllUsers(): Promise<User[]> {
-    await connectToDatabase();
-    const docs = await UserModel.find({ isActive: true }).exec();
-    return docs.map((u) => ({
-      id: u.id,
-      name: u.name,
-      email: u.email,
-      role: u.role,
-      createdAt: u.createdAt,
-      lastLogin: u.lastLogin,
-      isActive: u.isActive,
-      isSuperAdmin: u.isSuperAdmin,
-    }));
+    try {
+      await connectToDatabase();
+      const docs = await UserModel.find({ isActive: true }).exec();
+      return docs.map((u) => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        createdAt: u.createdAt,
+        lastLogin: u.lastLogin,
+        isActive: u.isActive,
+        isSuperAdmin: u.isSuperAdmin,
+      }));
+    } catch (_) {
+      if (DEV_FALLBACK_ENABLED) {
+        return fallbackUsers
+          .filter((u) => u.isActive)
+          .map((u) => ({
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            role: u.role,
+            createdAt: u.createdAt,
+            lastLogin: u.lastLogin,
+            isActive: u.isActive,
+            isSuperAdmin: Boolean(u.isSuperAdmin),
+          } as User));
+      }
+      throw _;
+    }
   }
 
   static async getUserByEmail(email: string): Promise<User | null> {
-    await connectToDatabase();
-    const u = await UserModel.findOne({
-      email: email.toLowerCase(),
-      isActive: true,
-    }).exec();
-    if (!u) return null;
-    return {
-      id: u.id,
-      name: u.name,
-      email: u.email,
-      role: u.role,
-      createdAt: u.createdAt,
-      lastLogin: u.lastLogin,
-      isActive: u.isActive,
-      isSuperAdmin: u.isSuperAdmin,
-    };
+    try {
+      await connectToDatabase();
+      const u = await UserModel.findOne({
+        email: email.toLowerCase(),
+        isActive: true,
+      }).exec();
+      if (!u) return null;
+      return {
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        createdAt: u.createdAt,
+        lastLogin: u.lastLogin,
+        isActive: u.isActive,
+        isSuperAdmin: u.isSuperAdmin,
+      };
+    } catch (_) {
+      if (DEV_FALLBACK_ENABLED) {
+        const u = fallbackUsers.find(
+          (x) => x.email === email.toLowerCase() && x.isActive,
+        );
+        if (!u) return null;
+        return {
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          role: u.role,
+          createdAt: u.createdAt,
+          lastLogin: u.lastLogin,
+          isActive: u.isActive,
+          isSuperAdmin: Boolean(u.isSuperAdmin),
+        } as User;
+      }
+      throw _;
+    }
   }
 
   static getSuperAdmin(): User | null {
     // Synchronous snapshot using cache; only id is reliable here
-    if (!superAdminIdCache) return null;
-    return {
-      id: superAdminIdCache,
-      name: "Super Admin",
-      email: "",
-      role: "admin",
-      createdAt: "",
-      isActive: true,
-      isSuperAdmin: true,
-    } as User;
+    if (superAdminIdCache) {
+      return {
+        id: superAdminIdCache,
+        name: "Super Admin",
+        email: "",
+        role: "admin",
+        createdAt: "",
+        isActive: true,
+        isSuperAdmin: true,
+      } as User;
+    }
+    if (DEV_FALLBACK_ENABLED) {
+      const admin = fallbackUsers.find((u) => u.isSuperAdmin);
+      if (admin) {
+        return {
+          id: admin.id,
+          name: admin.name,
+          email: admin.email,
+          role: admin.role,
+          createdAt: admin.createdAt,
+          isActive: true,
+          isSuperAdmin: true,
+        } as User;
+      }
+    }
+    return null;
   }
 
   static isSuperAdmin(userId: string): boolean {

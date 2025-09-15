@@ -11,7 +11,7 @@
     ]
   },
   "scripts": {
-    "dev": "concurrently \"pnpm run dev:backend\" \"pnpm run dev:frontend\"",
+    "dev": "pnpm run env:generate && concurrently \"pnpm run dev:backend\" \"pnpm run dev:frontend\"",
     "dev:auto": "node scripts/dev-auto.mjs",
     "dev:backend": "pnpm run dev:backend:express",
     "dev:backend:express": "tsx backend-express/server.ts",

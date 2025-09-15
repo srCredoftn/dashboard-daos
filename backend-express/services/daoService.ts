@@ -36,8 +36,17 @@ export class DaoService {
         .slice()
         .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     }
-    const daos = await DaoModel.find().sort({ updatedAt: -1 });
-    return daos.map((dao) => dao.toObject());
+    try {
+      const daos = await DaoModel.find().sort({ updatedAt: -1 });
+      return daos.map((dao) => dao.toObject());
+    } catch (e) {
+      console.warn("⚠️ DB error in getAllDaos, switching to in-memory fallback:", String(e));
+      useInMemory = true;
+      return daoStorage
+        .getAll()
+        .slice()
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    }
   }
 
   // Get last created DAO
@@ -49,8 +58,17 @@ export class DaoService {
       list.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
       return list[0];
     }
-    const doc = await DaoModel.findOne().sort({ createdAt: -1 });
-    return doc ? (doc.toObject() as Dao) : null;
+    try {
+      const doc = await DaoModel.findOne().sort({ createdAt: -1 });
+      return doc ? (doc.toObject() as Dao) : null;
+    } catch (e) {
+      console.warn("⚠️ DB error in getLastCreatedDao, using in-memory fallback:", String(e));
+      useInMemory = true;
+      const list = daoStorage.getAll().slice();
+      if (list.length === 0) return null;
+      list.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      return list[0];
+    }
   }
 
   // Delete last created DAO and return it
@@ -180,16 +198,22 @@ export class DaoService {
       }
     }
 
-    const total = await DaoModel.countDocuments(query);
-    const sortObj: any = {};
-    sortObj[sort] = order === "asc" ? 1 : -1;
+    try {
+      const total = await DaoModel.countDocuments(query);
+      const sortObj: any = {};
+      sortObj[sort] = order === "asc" ? 1 : -1;
 
-    const skip = Math.max(0, (Math.max(1, page) - 1) * pageSize);
-    const docs = await DaoModel.find(query)
-      .sort(sortObj)
-      .skip(skip)
-      .limit(pageSize);
-    return { items: docs.map((d: any) => d.toObject()), total };
+      const skip = Math.max(0, (Math.max(1, page) - 1) * pageSize);
+      const docs = await DaoModel.find(query)
+        .sort(sortObj)
+        .skip(skip)
+        .limit(pageSize);
+      return { items: docs.map((d: any) => d.toObject()), total };
+    } catch (e) {
+      console.warn("⚠️ DB error in getDaos, using in-memory fallback:", String(e));
+      useInMemory = true;
+      return this.getDaos({ search, autorite, dateFrom, dateTo, sort, order, page, pageSize });
+    }
   }
 
   // Get DAO by ID
@@ -205,8 +229,14 @@ export class DaoService {
       }
       return result;
     }
-    const dao = await DaoModel.findOne({ id });
-    return dao ? dao.toObject() : null;
+    try {
+      const dao = await DaoModel.findOne({ id });
+      return dao ? dao.toObject() : null;
+    } catch (e) {
+      console.warn("⚠️ DB error in getDaoById, using in-memory fallback:", String(e));
+      useInMemory = true;
+      return daoStorage.findById(id) || null;
+    }
   }
 
   // Generate next DAO number (mutating: advances baseline for creations)
@@ -232,14 +262,25 @@ export class DaoService {
       return `DAO-${year}-${nextSeq.toString().padStart(3, "0")}`;
     }
 
-    const existingDaos = await DaoModel.find({
-      numeroListe: { $regex: `^DAO-${year}-` },
-    });
-    const maxSeq = computeMaxSeq(existingDaos as any);
-    const baseline = Math.max(lastIssuedSeqByYear[String(year)] || 0, maxSeq);
-    const nextSeq = baseline + 1;
-    lastIssuedSeqByYear[String(year)] = nextSeq; // advance baseline only on generate (creation)
-    return `DAO-${year}-${nextSeq.toString().padStart(3, "0")}`;
+    try {
+      const existingDaos = await DaoModel.find({
+        numeroListe: { $regex: `^DAO-${year}-` },
+      });
+      const maxSeq = computeMaxSeq(existingDaos as any);
+      const baseline = Math.max(lastIssuedSeqByYear[String(year)] || 0, maxSeq);
+      const nextSeq = baseline + 1;
+      lastIssuedSeqByYear[String(year)] = nextSeq; // advance baseline only on generate (creation)
+      return `DAO-${year}-${nextSeq.toString().padStart(3, "0")}`;
+    } catch (e) {
+      console.warn("⚠️ DB error in generateNextDaoNumber, using in-memory fallback:", String(e));
+      useInMemory = true;
+      const all = daoStorage.getAll();
+      const maxSeq = computeMaxSeq(all);
+      const baseline = Math.max(lastIssuedSeqByYear[String(year)] || 0, maxSeq);
+      const nextSeq = baseline + 1;
+      lastIssuedSeqByYear[String(year)] = nextSeq;
+      return `DAO-${year}-${nextSeq.toString().padStart(3, "0")}`;
+    }
   }
 
   // Peek next DAO number (non-mutating; safe for UI checks)
@@ -264,13 +305,23 @@ export class DaoService {
       return `DAO-${year}-${nextSeq.toString().padStart(3, "0")}`;
     }
 
-    const existingDaos = await DaoModel.find({
-      numeroListe: { $regex: `^DAO-${year}-` },
-    });
-    const maxSeq = computeMaxSeq(existingDaos as any);
-    const baseline = Math.max(lastIssuedSeqByYear[String(year)] || 0, maxSeq);
-    const nextSeq = baseline + 1;
-    return `DAO-${year}-${nextSeq.toString().padStart(3, "0")}`;
+    try {
+      const existingDaos = await DaoModel.find({
+        numeroListe: { $regex: `^DAO-${year}-` },
+      });
+      const maxSeq = computeMaxSeq(existingDaos as any);
+      const baseline = Math.max(lastIssuedSeqByYear[String(year)] || 0, maxSeq);
+      const nextSeq = baseline + 1;
+      return `DAO-${year}-${nextSeq.toString().padStart(3, "0")}`;
+    } catch (e) {
+      console.warn("⚠️ DB error in peekNextDaoNumber, using in-memory fallback:", String(e));
+      useInMemory = true;
+      const all = daoStorage.getAll();
+      const maxSeq = computeMaxSeq(all);
+      const baseline = Math.max(lastIssuedSeqByYear[String(year)] || 0, maxSeq);
+      const nextSeq = baseline + 1;
+      return `DAO-${year}-${nextSeq.toString().padStart(3, "0")}`;
+    }
   }
 
   // Create new DAO
@@ -322,13 +373,30 @@ export class DaoService {
           numeroListe = await this.generateNextDaoNumber();
           continue;
         }
-        throw e;
+        console.warn("⚠️ DB error in createDao, using in-memory fallback:", msg);
+        useInMemory = true;
+        const newDao: Dao = {
+          ...daoData,
+          numeroListe,
+          id,
+          createdAt: now,
+          updatedAt: now,
+        } as Dao;
+        daoStorage.add(newDao);
+        return newDao;
       }
     }
-    // Final attempt failed due to persistent duplicates
-    throw new Error(
-      "Failed to create DAO due to concurrent numbering conflicts",
-    );
+    // Final attempt failed due to persistent duplicates or DB errors — fallback
+    const fallbackDao: Dao = {
+      ...daoData,
+      numeroListe,
+      id,
+      createdAt: now,
+      updatedAt: now,
+    } as Dao;
+    daoStorage.add(fallbackDao);
+    useInMemory = true;
+    return fallbackDao;
   }
 
   // Update DAO
@@ -349,12 +417,27 @@ export class DaoService {
       daoStorage.updateAtIndex(index, updated);
       return updated;
     }
-    const updatedDao = await DaoModel.findOneAndUpdate(
-      { id },
-      { ...updates, updatedAt: new Date().toISOString() },
-      { new: true },
-    );
-    return updatedDao ? updatedDao.toObject() : null;
+    try {
+      const updatedDao = await DaoModel.findOneAndUpdate(
+        { id },
+        { ...updates, updatedAt: new Date().toISOString() },
+        { new: true },
+      );
+      return updatedDao ? updatedDao.toObject() : null;
+    } catch (e) {
+      console.warn("⚠️ DB error in updateDao, using in-memory fallback:", String(e));
+      useInMemory = true;
+      const index = daoStorage.findIndexById(id);
+      if (index === -1) return null;
+      const existing = daoStorage.findById(id)!;
+      const updated: Dao = {
+        ...existing,
+        ...updates,
+        updatedAt: new Date().toISOString(),
+      } as Dao;
+      daoStorage.updateAtIndex(index, updated);
+      return updated;
+    }
   }
 
   // Delete DAO
@@ -384,24 +467,49 @@ export class DaoService {
       }
       return ok;
     }
-    const doc = await DaoModel.findOne({ id });
-    const result = await DaoModel.deleteOne({ id });
-    if (result.deletedCount && doc?.numeroListe) {
-      const m = doc.numeroListe.match(/DAO-(\d{4})-(\d{3})/);
-      if (m) {
-        const year = m[1];
-        const remaining = await DaoModel.find({
-          numeroListe: { $regex: `^DAO-${year}-` },
-        });
-        const nums = remaining
-          .map((d: any) =>
-            parseInt(d.numeroListe.match(/DAO-\d{4}-(\d{3})/)?.[1] || "0", 10),
-          )
-          .filter((n: number) => !isNaN(n));
-        lastIssuedSeqByYear[year] = nums.length ? Math.max(...nums) : 0;
+    try {
+      const doc = await DaoModel.findOne({ id });
+      const result = await DaoModel.deleteOne({ id });
+      if (result.deletedCount && doc?.numeroListe) {
+        const m = doc.numeroListe.match(/DAO-(\d{4})-(\d{3})/);
+        if (m) {
+          const year = m[1];
+          const remaining = await DaoModel.find({
+            numeroListe: { $regex: `^DAO-${year}-` },
+          });
+          const nums = remaining
+            .map((d: any) => {
+              const m2 = d.numeroListe.match(/DAO-\d{4}-(\d{3})/);
+              return parseInt((m2 ? m2[1] : "0") as string, 10);
+            })
+            .filter((n: number) => !isNaN(n));
+          lastIssuedSeqByYear[year] = nums.length ? Math.max(...nums) : 0;
+        }
       }
+      return result.deletedCount > 0;
+    } catch (e) {
+      console.warn("⚠️ DB error in deleteDao, using in-memory fallback:", String(e));
+      useInMemory = true;
+      const existing = daoStorage.findById(id);
+      const ok = daoStorage.deleteById(id);
+      if (ok && existing?.numeroListe) {
+        const m = existing.numeroListe.match(/DAO-(\d{4})-(\d{3})/);
+        if (m) {
+          const year = m[1];
+          const maxSeq = daoStorage
+            .getAll()
+            .filter((d) => d.numeroListe.startsWith(`DAO-${year}-`))
+            .map((d) => {
+              const mm = d.numeroListe.match(/DAO-\d{4}-(\d{3})/);
+              return parseInt((mm ? mm[1] : "0") as string, 10);
+            })
+            .filter((n) => !isNaN(n))
+            .reduce((a, b) => Math.max(a, b), 0);
+          lastIssuedSeqByYear[year] = maxSeq;
+        }
+      }
+      return ok;
     }
-    return result.deletedCount > 0;
   }
 
   // Initialize with sample data if empty
