@@ -13,8 +13,9 @@ import mongoose from "mongoose";
 import UserModel, { type UserDocument } from "../models/User";
 
 const JWT_SECRET = process.env.JWT_SECRET;
+const FORCE_DB_ONLY = (process.env.FORCE_DB_ONLY || "false").toLowerCase() === "true" || process.env.FORCE_DB_ONLY === "1";
 const DEV_FALLBACK_ENABLED =
-  ((process.env.ALLOW_DEV_AUTH_FALLBACK || "true").toLowerCase() ===
+  !FORCE_DB_ONLY && ((process.env.ALLOW_DEV_AUTH_FALLBACK || "true").toLowerCase() ===
     "true" && process.env.NODE_ENV !== "production");
 
 // In-memory fallback users for development when MongoDB is unavailable
@@ -209,6 +210,9 @@ export class AuthService {
     try {
       await ensureInitialUsers();
     } catch (e) {
+      if (FORCE_DB_ONLY) {
+        throw e;
+      }
       devLog.error(
         "Auth initialization skipped due to DB connectivity issues",
         e,
