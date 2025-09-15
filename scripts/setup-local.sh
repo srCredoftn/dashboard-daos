@@ -49,16 +49,15 @@ pnpm install
 # 4) Generate env files with strong secrets
 pnpm run env:generate
 
-# 5) Install backend-mongodb deps
-( cd backend-mongodb && pnpm install )
-
-# 6) Done: suggest auto dev
+# 5) Done: suggest dev
 cat <<EOF
 
 🎉 Setup completed.
-Run one of:
-  pnpm dev:auto        # Auto-switch backend (Mongo if available, else Express)
-  pnpm dev             # Current default (Express backend)
-  pnpm db:queries      # Sample DB queries against Mongo
+Run:
+  pnpm dev             # Starts Express backend (MongoDB required) + Vite
+
+Health:
+  http://localhost:3001/api/health
+  http://localhost:3001/api/health/db
 
 EOF

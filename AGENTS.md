@@ -25,11 +25,6 @@ backend-express/          # Express API backend (renamed from server/)
 ├── index.ts              # Main server setup (express config + routes)
 └── routes/               # API handlers
 
-backend-mongodb/          # Alternative MongoDB backend (standalone)
-├── src/                  # Source code
-├── models/               # Mongoose models
-└── routes/               # API routes with MongoDB
-
 shared/                   # Types used by both frontend & backend
 └── api.ts                # Example of how to share api interfaces
 ```

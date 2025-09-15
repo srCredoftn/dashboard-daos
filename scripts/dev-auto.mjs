@@ -22,22 +22,14 @@ function checkPort(host, port, timeout = 800) {
 }
 
 async function run() {
-  const mongoUp = await checkPort("127.0.0.1", 27017).catch(() => false);
-  const useMongo = !!mongoUp;
-
   const envFrontend = {
     ...process.env,
-    BACKEND_URL: useMongo ? "http://localhost:5000" : "http://localhost:3001",
+    BACKEND_URL: "http://localhost:3001",
   };
 
-  const backendCmd = useMongo
-    ? ["run", "dev:backend:mongo"]
-    : ["run", "dev:backend:express"];
-  console.log(
-    `🚀 Starting ${useMongo ? "MongoDB" : "Express"} backend and Vite (proxy → ${envFrontend.BACKEND_URL})`,
-  );
+  console.log(`🚀 Starting Express backend and Vite (proxy → ${envFrontend.BACKEND_URL})`);
 
-  const backend = spawn("pnpm", backendCmd, {
+  const backend = spawn("pnpm", ["run", "dev:backend:express"], {
     stdio: "inherit",
     env: process.env,
   });
