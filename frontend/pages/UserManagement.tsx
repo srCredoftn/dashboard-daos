@@ -197,9 +197,22 @@ export default function UserManagement() {
         description: `L'utilisateur ${newUser.name} a été créé avec succès.`,
       });
     } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      let description = "Impossible de créer l'utilisateur.";
+      if (msg.includes("USER_EXISTS") || msg.includes("User already exists")) {
+        description = "Un utilisateur avec cet email existe déjà.";
+      } else if (msg.includes("NAME_TAKEN") || msg.includes("User name already taken")) {
+        description = "Ce nom est déjà utilisé par un autre utilisateur.";
+      } else if (msg.toLowerCase().includes("validation") || msg.includes("VALIDATION_ERROR")) {
+        description = "Veuillez renseigner un nom, un email valide, un rôle et un mot de passe.";
+      } else if (msg.startsWith("HTTP error!") || /^\d{3}/.test(msg)) {
+        description = `Erreur serveur: ${msg}`;
+      } else if (msg) {
+        description = msg;
+      }
       toast({
         title: "Erreur",
-        description: "Impossible de créer l'utilisateur.",
+        description,
         variant: "destructive",
       });
     } finally {
