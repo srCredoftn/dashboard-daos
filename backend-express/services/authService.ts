@@ -532,51 +532,105 @@ export class AuthService {
     role: UserRole;
     password?: string;
   }): Promise<User> {
-    await connectToDatabase();
-
     const normalizedName = normalizeName(userData.name);
 
-    const sameName = await UserModel.findOne({
-      isActive: true,
-      name: new RegExp(`^${normalizedName}$`, "i"),
-    }).exec();
-    if (sameName) {
-      throw new Error("User name already taken");
+    // Try database path first
+    try {
+      await connectToDatabase();
+
+      const sameName = await UserModel.findOne({
+        isActive: true,
+        name: new RegExp(`^${normalizedName}$`, "i"),
+      }).exec();
+      if (sameName) {
+        throw new Error("User name already taken");
+      }
+
+      const existingUser = await UserModel.findOne({
+        email: userData.email.toLowerCase(),
+      }).exec();
+      if (existingUser) {
+        throw new Error("User already exists");
+      }
+
+      const defaultPassword = userData.password || "changeme123";
+      const passwordHash = await bcrypt.hash(defaultPassword, 12);
+
+      const doc = await UserModel.create({
+        id: new mongoose.Types.ObjectId().toHexString(),
+        name: normalizedName,
+        email: userData.email.toLowerCase(),
+        role: userData.role,
+        createdAt: new Date().toISOString(),
+        isActive: true,
+        passwordHash,
+        isSuperAdmin: userData.role === "admin",
+      });
+
+      devLog.info(`👤 New user created: ${doc.email} Role: ${doc.role}`);
+      if (doc.role === "admin") await refreshSuperAdminCache();
+      return {
+        id: doc.id,
+        name: doc.name,
+        email: doc.email,
+        role: doc.role,
+        createdAt: doc.createdAt,
+        isActive: doc.isActive,
+        lastLogin: doc.lastLogin,
+        isSuperAdmin: doc.isSuperAdmin,
+      };
+    } catch (dbErr) {
+      // If DB is unavailable and dev fallback is enabled, create in-memory user
+      if (!DEV_FALLBACK_ENABLED) throw dbErr;
+
+      // Unique checks in fallback store
+      const emailLower = userData.email.toLowerCase();
+      const nameConflict = fallbackUsers.some(
+        (u) => u.isActive && u.name.toLowerCase() === normalizedName.toLowerCase(),
+      );
+      if (nameConflict) {
+        throw new Error("User name already taken");
+      }
+      const emailConflict = fallbackUsers.some(
+        (u) => u.email === emailLower,
+      );
+      if (emailConflict) {
+        throw new Error("User already exists");
+      }
+
+      const defaultPassword = userData.password || "changeme123";
+      const passwordHash = await bcrypt.hash(defaultPassword, 12);
+      const id = new mongoose.Types.ObjectId().toHexString();
+      const now = new Date().toISOString();
+      const isAdmin = userData.role === "admin";
+
+      fallbackUsers.push({
+        id,
+        name: normalizedName,
+        email: emailLower,
+        role: userData.role,
+        passwordHash,
+        createdAt: now,
+        isActive: true,
+        isSuperAdmin: isAdmin,
+      });
+
+      if (isAdmin) {
+        superAdminIdCache = id;
+      }
+
+      devLog.info(`👤 New user created (fallback): ${emailLower} Role: ${userData.role}`);
+      return {
+        id,
+        name: normalizedName,
+        email: emailLower,
+        role: userData.role,
+        createdAt: now,
+        isActive: true,
+        lastLogin: undefined,
+        isSuperAdmin: isAdmin,
+      } as User;
     }
-
-    const existingUser = await UserModel.findOne({
-      email: userData.email.toLowerCase(),
-    }).exec();
-    if (existingUser) {
-      throw new Error("User already exists");
-    }
-
-    const defaultPassword = userData.password || "changeme123";
-    const passwordHash = await bcrypt.hash(defaultPassword, 12);
-
-    const doc = await UserModel.create({
-      id: new mongoose.Types.ObjectId().toHexString(),
-      name: normalizedName,
-      email: userData.email.toLowerCase(),
-      role: userData.role,
-      createdAt: new Date().toISOString(),
-      isActive: true,
-      passwordHash,
-      isSuperAdmin: userData.role === "admin",
-    });
-
-    devLog.info(`👤 New user created: ${doc.email} Role: ${doc.role}`);
-    if (doc.role === "admin") await refreshSuperAdminCache();
-    return {
-      id: doc.id,
-      name: doc.name,
-      email: doc.email,
-      role: doc.role,
-      createdAt: doc.createdAt,
-      isActive: doc.isActive,
-      lastLogin: doc.lastLogin,
-      isSuperAdmin: doc.isSuperAdmin,
-    };
   }
 
   static async updateUserRole(
