@@ -19,8 +19,9 @@ const FORCE_DB_ONLY = (() => {
   return v === "1" || v.toLowerCase() === "true";
 })();
 const DEV_FALLBACK_ENABLED =
-  !FORCE_DB_ONLY && ((process.env.ALLOW_DEV_AUTH_FALLBACK || "false").toLowerCase() ===
-    "true" && process.env.NODE_ENV !== "production");
+  !FORCE_DB_ONLY &&
+  (process.env.ALLOW_DEV_AUTH_FALLBACK || "false").toLowerCase() === "true" &&
+  process.env.NODE_ENV !== "production";
 
 // In-memory fallback users for development when MongoDB is unavailable
 const fallbackUsers: Array<{
@@ -40,9 +41,24 @@ function seedFallbackUsers() {
   if (fallbackUsers.length > 0) return;
   const now = new Date().toISOString();
   const demo = [
-    { name: "Admin User", email: "admin@2snd.fr", role: "admin" as UserRole, password: "admin123" },
-    { name: "Marie Dubois", email: "marie.dubois@2snd.fr", role: "user" as UserRole, password: "marie123" },
-    { name: "Pierre Martin", email: "pierre.martin@2snd.fr", role: "user" as UserRole, password: "pierre123" },
+    {
+      name: "Admin User",
+      email: "admin@2snd.fr",
+      role: "admin" as UserRole,
+      password: "admin123",
+    },
+    {
+      name: "Marie Dubois",
+      email: "marie.dubois@2snd.fr",
+      role: "user" as UserRole,
+      password: "marie123",
+    },
+    {
+      name: "Pierre Martin",
+      email: "pierre.martin@2snd.fr",
+      role: "user" as UserRole,
+      password: "pierre123",
+    },
   ];
   for (const u of demo) {
     const id = new mongoose.Types.ObjectId().toHexString();
@@ -324,7 +340,9 @@ export class AuthService {
         return decoded;
       } catch (dbErr) {
         if (DEV_FALLBACK_ENABLED) {
-          const u = fallbackUsers.find((x) => x.id === decoded.id && x.isActive);
+          const u = fallbackUsers.find(
+            (x) => x.id === decoded.id && x.isActive,
+          );
           if (u) {
             if (!activeSessions.has(token)) activeSessions.add(token);
             authLog.tokenVerification(u.email, true);
@@ -415,16 +433,19 @@ export class AuthService {
       if (DEV_FALLBACK_ENABLED) {
         return fallbackUsers
           .filter((u) => u.isActive)
-          .map((u) => ({
-            id: u.id,
-            name: u.name,
-            email: u.email,
-            role: u.role,
-            createdAt: u.createdAt,
-            lastLogin: u.lastLogin,
-            isActive: u.isActive,
-            isSuperAdmin: Boolean(u.isSuperAdmin),
-          } as User));
+          .map(
+            (u) =>
+              ({
+                id: u.id,
+                name: u.name,
+                email: u.email,
+                role: u.role,
+                createdAt: u.createdAt,
+                lastLogin: u.lastLogin,
+                isActive: u.isActive,
+                isSuperAdmin: Boolean(u.isSuperAdmin),
+              }) as User,
+          );
       }
       throw _;
     }
@@ -555,47 +576,49 @@ export class AuthService {
       }
 
       const existingUser = await UserModel.findOne({
-      email: userData.email.toLowerCase(),
-    }).exec();
-    if (existingUser) {
-      if (!existingUser.isActive) {
-        // Reactivate existing inactive account with new credentials and role
-        const defaultPassword = userData.password || "changeme123";
-        existingUser.name = normalizedName;
-        existingUser.role = userData.role;
-        existingUser.isActive = true;
-        existingUser.isSuperAdmin = userData.role === "admin";
-        existingUser.passwordHash = await bcrypt.hash(defaultPassword, 12);
-        await existingUser.save();
-        devLog.info(`👤 User reactivated: ${existingUser.email} Role: ${existingUser.role}`);
-        if (existingUser.role === "admin") await refreshSuperAdminCache();
-        return {
-          id: existingUser.id,
-          name: existingUser.name,
-          email: existingUser.email,
-          role: existingUser.role,
-          createdAt: existingUser.createdAt,
-          isActive: existingUser.isActive,
-          lastLogin: existingUser.lastLogin,
-          isSuperAdmin: existingUser.isSuperAdmin,
-        };
+        email: userData.email.toLowerCase(),
+      }).exec();
+      if (existingUser) {
+        if (!existingUser.isActive) {
+          // Reactivate existing inactive account with new credentials and role
+          const defaultPassword = userData.password || "changeme123";
+          existingUser.name = normalizedName;
+          existingUser.role = userData.role;
+          existingUser.isActive = true;
+          existingUser.isSuperAdmin = userData.role === "admin";
+          existingUser.passwordHash = await bcrypt.hash(defaultPassword, 12);
+          await existingUser.save();
+          devLog.info(
+            `👤 User reactivated: ${existingUser.email} Role: ${existingUser.role}`,
+          );
+          if (existingUser.role === "admin") await refreshSuperAdminCache();
+          return {
+            id: existingUser.id,
+            name: existingUser.name,
+            email: existingUser.email,
+            role: existingUser.role,
+            createdAt: existingUser.createdAt,
+            isActive: existingUser.isActive,
+            lastLogin: existingUser.lastLogin,
+            isSuperAdmin: existingUser.isSuperAdmin,
+          };
+        }
+        throw new Error("User already exists");
       }
-      throw new Error("User already exists");
-    }
 
-    const defaultPassword = userData.password || "changeme123";
-    const passwordHash = await bcrypt.hash(defaultPassword, 12);
+      const defaultPassword = userData.password || "changeme123";
+      const passwordHash = await bcrypt.hash(defaultPassword, 12);
 
-    const doc = await UserModel.create({
-      id: new mongoose.Types.ObjectId().toHexString(),
-      name: normalizedName,
-      email: userData.email.toLowerCase(),
-      role: userData.role,
-      createdAt: new Date().toISOString(),
-      isActive: true,
-      passwordHash,
-      isSuperAdmin: userData.role === "admin",
-    });
+      const doc = await UserModel.create({
+        id: new mongoose.Types.ObjectId().toHexString(),
+        name: normalizedName,
+        email: userData.email.toLowerCase(),
+        role: userData.role,
+        createdAt: new Date().toISOString(),
+        isActive: true,
+        passwordHash,
+        isSuperAdmin: userData.role === "admin",
+      });
 
       devLog.info(`👤 New user created: ${doc.email} Role: ${doc.role}`);
       if (doc.role === "admin") await refreshSuperAdminCache();
@@ -616,14 +639,13 @@ export class AuthService {
       // Unique checks in fallback store
       const emailLower = userData.email.toLowerCase();
       const nameConflict = fallbackUsers.some(
-        (u) => u.isActive && u.name.toLowerCase() === normalizedName.toLowerCase(),
+        (u) =>
+          u.isActive && u.name.toLowerCase() === normalizedName.toLowerCase(),
       );
       if (nameConflict) {
         throw new Error("User name already taken");
       }
-      const emailConflict = fallbackUsers.some(
-        (u) => u.email === emailLower,
-      );
+      const emailConflict = fallbackUsers.some((u) => u.email === emailLower);
       if (emailConflict) {
         throw new Error("User already exists");
       }
@@ -649,7 +671,9 @@ export class AuthService {
         superAdminIdCache = id;
       }
 
-      devLog.info(`👤 New user created (fallback): ${emailLower} Role: ${userData.role}`);
+      devLog.info(
+        `👤 New user created (fallback): ${emailLower} Role: ${userData.role}`,
+      );
       return {
         id,
         name: normalizedName,
@@ -863,7 +887,11 @@ export class AuthService {
 
 AuthService.initialize().catch((e) => {
   devLog.error("Auth initialization error", e);
-  if (process.env.FORCE_DB_ONLY === undefined || process.env.FORCE_DB_ONLY === "1" || String(process.env.FORCE_DB_ONLY).toLowerCase() === "true") {
+  if (
+    process.env.FORCE_DB_ONLY === undefined ||
+    process.env.FORCE_DB_ONLY === "1" ||
+    String(process.env.FORCE_DB_ONLY).toLowerCase() === "true"
+  ) {
     // Fail fast in DB-only default mode so issues are visible
     throw e;
   }

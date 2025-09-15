@@ -22,7 +22,10 @@ async function tryConnect(): Promise<boolean> {
     return true;
   } catch (e) {
     if (FORCE_DB_ONLY) {
-      console.error("❌ MongoDB connection failed and FORCE_DB_ONLY is set.", e);
+      console.error(
+        "❌ MongoDB connection failed and FORCE_DB_ONLY is set.",
+        e,
+      );
       throw e;
     }
     console.warn("⚠️ MongoDB not available, falling back to in-memory storage");
@@ -50,7 +53,10 @@ export class DaoService {
       return daos.map((dao) => dao.toObject());
     } catch (e) {
       if (FORCE_DB_ONLY) throw e;
-      console.warn("⚠️ DB error in getAllDaos, switching to in-memory fallback:", String(e));
+      console.warn(
+        "⚠️ DB error in getAllDaos, switching to in-memory fallback:",
+        String(e),
+      );
       useInMemory = true;
       return daoStorage
         .getAll()
@@ -73,7 +79,10 @@ export class DaoService {
       return doc ? (doc.toObject() as Dao) : null;
     } catch (e) {
       if (FORCE_DB_ONLY) throw e;
-      console.warn("⚠️ DB error in getLastCreatedDao, using in-memory fallback:", String(e));
+      console.warn(
+        "⚠️ DB error in getLastCreatedDao, using in-memory fallback:",
+        String(e),
+      );
       useInMemory = true;
       const list = daoStorage.getAll().slice();
       if (list.length === 0) return null;
@@ -222,9 +231,21 @@ export class DaoService {
       return { items: docs.map((d: any) => d.toObject()), total };
     } catch (e) {
       if (FORCE_DB_ONLY) throw e;
-      console.warn("⚠️ DB error in getDaos, using in-memory fallback:", String(e));
+      console.warn(
+        "⚠️ DB error in getDaos, using in-memory fallback:",
+        String(e),
+      );
       useInMemory = true;
-      return this.getDaos({ search, autorite, dateFrom, dateTo, sort, order, page, pageSize });
+      return this.getDaos({
+        search,
+        autorite,
+        dateFrom,
+        dateTo,
+        sort,
+        order,
+        page,
+        pageSize,
+      });
     }
   }
 
@@ -246,7 +267,10 @@ export class DaoService {
       return dao ? dao.toObject() : null;
     } catch (e) {
       if (FORCE_DB_ONLY) throw e;
-      console.warn("⚠️ DB error in getDaoById, using in-memory fallback:", String(e));
+      console.warn(
+        "⚠️ DB error in getDaoById, using in-memory fallback:",
+        String(e),
+      );
       useInMemory = true;
       return daoStorage.findById(id) || null;
     }
@@ -285,7 +309,10 @@ export class DaoService {
       lastIssuedSeqByYear[String(year)] = nextSeq; // advance baseline only on generate (creation)
       return `DAO-${year}-${nextSeq.toString().padStart(3, "0")}`;
     } catch (e) {
-      console.warn("⚠️ DB error in generateNextDaoNumber, using in-memory fallback:", String(e));
+      console.warn(
+        "⚠️ DB error in generateNextDaoNumber, using in-memory fallback:",
+        String(e),
+      );
       useInMemory = true;
       const all = daoStorage.getAll();
       const maxSeq = computeMaxSeq(all);
@@ -327,7 +354,10 @@ export class DaoService {
       const nextSeq = baseline + 1;
       return `DAO-${year}-${nextSeq.toString().padStart(3, "0")}`;
     } catch (e) {
-      console.warn("⚠️ DB error in peekNextDaoNumber, using in-memory fallback:", String(e));
+      console.warn(
+        "⚠️ DB error in peekNextDaoNumber, using in-memory fallback:",
+        String(e),
+      );
       useInMemory = true;
       const all = daoStorage.getAll();
       const maxSeq = computeMaxSeq(all);
@@ -387,7 +417,10 @@ export class DaoService {
           continue;
         }
         if (FORCE_DB_ONLY) throw e;
-        console.warn("⚠️ DB error in createDao, using in-memory fallback:", msg);
+        console.warn(
+          "⚠️ DB error in createDao, using in-memory fallback:",
+          msg,
+        );
         useInMemory = true;
         const newDao: Dao = {
           ...daoData,
@@ -440,7 +473,10 @@ export class DaoService {
       return updatedDao ? updatedDao.toObject() : null;
     } catch (e) {
       if (FORCE_DB_ONLY) throw e;
-      console.warn("⚠️ DB error in updateDao, using in-memory fallback:", String(e));
+      console.warn(
+        "⚠️ DB error in updateDao, using in-memory fallback:",
+        String(e),
+      );
       useInMemory = true;
       const index = daoStorage.findIndexById(id);
       if (index === -1) return null;
@@ -504,7 +540,10 @@ export class DaoService {
       return result.deletedCount > 0;
     } catch (e) {
       if (FORCE_DB_ONLY) throw e;
-      console.warn("⚠️ DB error in deleteDao, using in-memory fallback:", String(e));
+      console.warn(
+        "⚠️ DB error in deleteDao, using in-memory fallback:",
+        String(e),
+      );
       useInMemory = true;
       const existing = daoStorage.findById(id);
       const ok = daoStorage.deleteById(id);

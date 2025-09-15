@@ -27,7 +27,9 @@ async function run() {
     BACKEND_URL: "http://localhost:3001",
   };
 
-  console.log(`🚀 Starting Express backend and Vite (proxy → ${envFrontend.BACKEND_URL})`);
+  console.log(
+    `🚀 Starting Express backend and Vite (proxy → ${envFrontend.BACKEND_URL})`,
+  );
 
   const backend = spawn("pnpm", ["run", "dev:backend:express"], {
     stdio: "inherit",

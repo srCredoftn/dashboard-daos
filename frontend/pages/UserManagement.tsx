@@ -167,7 +167,10 @@ export default function UserManagement() {
     }
 
     // Check if name already exists (case-insensitive)
-    if (trimmedName && users.some((u) => u.name.toLowerCase() === trimmedName.toLowerCase())) {
+    if (
+      trimmedName &&
+      users.some((u) => u.name.toLowerCase() === trimmedName.toLowerCase())
+    ) {
       newErrors.name = newErrors.name || "Ce nom est déjà utilisé";
     }
 
@@ -201,10 +204,17 @@ export default function UserManagement() {
       let description = "Impossible de créer l'utilisateur.";
       if (msg.includes("USER_EXISTS") || msg.includes("User already exists")) {
         description = "Un utilisateur avec cet email existe déjà.";
-      } else if (msg.includes("NAME_TAKEN") || msg.includes("User name already taken")) {
+      } else if (
+        msg.includes("NAME_TAKEN") ||
+        msg.includes("User name already taken")
+      ) {
         description = "Ce nom est déjà utilisé par un autre utilisateur.";
-      } else if (msg.toLowerCase().includes("validation") || msg.includes("VALIDATION_ERROR")) {
-        description = "Veuillez renseigner un nom, un email valide, un rôle et un mot de passe.";
+      } else if (
+        msg.toLowerCase().includes("validation") ||
+        msg.includes("VALIDATION_ERROR")
+      ) {
+        description =
+          "Veuillez renseigner un nom, un email valide, un rôle et un mot de passe.";
       } else if (msg.startsWith("HTTP error!") || /^\d{3}/.test(msg)) {
         description = `Erreur serveur: ${msg}`;
       } else if (msg) {
@@ -234,7 +244,9 @@ export default function UserManagement() {
     setDeleteError(null);
     try {
       const idempotencyKey = `deactivate-user:${userId}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
-      await authService.deactivateUser(userId, deletePassword, { idempotencyKey });
+      await authService.deactivateUser(userId, deletePassword, {
+        idempotencyKey,
+      });
       setUsers(users.filter((u) => u.id !== userId));
       setDeletePassword("");
       toast({
@@ -244,7 +256,10 @@ export default function UserManagement() {
       return true;
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
-      if (msg.toLowerCase().includes("invalid password") || msg.includes("INVALID_PASSWORD")) {
+      if (
+        msg.toLowerCase().includes("invalid password") ||
+        msg.includes("INVALID_PASSWORD")
+      ) {
         setDeleteError("Mot de passe incorrect, veuillez réessayer");
         return false;
       }
@@ -607,24 +622,35 @@ export default function UserManagement() {
                             }
                             title="Supprimer l'utilisateur"
                             description={`Êtes-vous sûr de vouloir supprimer l'utilisateur "${userData.name}" ? Cette action est irréversible.\n\nPour confirmer, entrez le mot de passe du Super Admin.`}
-                            confirmText={processingDelete ? "En cours..." : "Supprimer"}
+                            confirmText={
+                              processingDelete ? "En cours..." : "Supprimer"
+                            }
                             onConfirm={() =>
                               handleDeleteUser(userData.id, userData.name)
                             }
-                            disabled={userData.id === user?.id || deletePassword.length === 0}
+                            disabled={
+                              userData.id === user?.id ||
+                              deletePassword.length === 0
+                            }
                             icon="trash"
                           >
                             <div className="mt-4 space-y-2">
-                              <Label htmlFor={`delete-password-${userData.id}`}>Mot de passe Super Admin</Label>
+                              <Label htmlFor={`delete-password-${userData.id}`}>
+                                Mot de passe Super Admin
+                              </Label>
                               <Input
                                 id={`delete-password-${userData.id}`}
                                 type="password"
                                 value={deletePassword}
-                                onChange={(e) => setDeletePassword(e.target.value)}
+                                onChange={(e) =>
+                                  setDeletePassword(e.target.value)
+                                }
                                 placeholder="Entrez le mot de passe"
                               />
                               {deleteError && (
-                                <p className="text-sm text-red-600">{deleteError}</p>
+                                <p className="text-sm text-red-600">
+                                  {deleteError}
+                                </p>
                               )}
                             </div>
                           </ConfirmationDialog>

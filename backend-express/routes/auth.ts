@@ -163,7 +163,10 @@ router.post("/users", authenticate, requireAdmin, async (req, res) => {
     if (!userData.name || !userData.email || !userData.role) {
       return res
         .status(400)
-        .json({ error: "Name, email, and role are required", code: "VALIDATION_ERROR" });
+        .json({
+          error: "Name, email, and role are required",
+          code: "VALIDATION_ERROR",
+        });
     }
 
     let newUser;
@@ -177,11 +180,19 @@ router.post("/users", authenticate, requireAdmin, async (req, res) => {
     } catch (e: any) {
       const msg = (e?.message || "").toString();
       // Map known business errors to 400-level responses
-      if (msg.includes("User already exists") || msg.toLowerCase().includes("duplicate key") || (e && (e as any).code === 11000)) {
-        return res.status(400).json({ error: "User already exists", code: "USER_EXISTS" });
+      if (
+        msg.includes("User already exists") ||
+        msg.toLowerCase().includes("duplicate key") ||
+        (e && (e as any).code === 11000)
+      ) {
+        return res
+          .status(400)
+          .json({ error: "User already exists", code: "USER_EXISTS" });
       }
       if (msg.includes("User name already taken")) {
-        return res.status(400).json({ error: "User name already taken", code: "NAME_TAKEN" });
+        return res
+          .status(400)
+          .json({ error: "User name already taken", code: "NAME_TAKEN" });
       }
       // Unknown error -> rethrow to outer catch
       throw e;
@@ -219,7 +230,12 @@ router.post("/users", authenticate, requireAdmin, async (req, res) => {
   } catch (error) {
     devLog.error("Create user error:", error);
     const msg = (error as any)?.message;
-    return res.status(500).json({ error: msg || "Failed to create user", code: "CREATE_USER_FAILED" });
+    return res
+      .status(500)
+      .json({
+        error: msg || "Failed to create user",
+        code: "CREATE_USER_FAILED",
+      });
   }
 });
 

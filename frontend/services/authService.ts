@@ -280,7 +280,10 @@ class AuthApiService {
     password: string,
     opts?: { idempotencyKey?: string },
   ): Promise<void> {
-    const options: any = { method: "DELETE", body: JSON.stringify({ password }) };
+    const options: any = {
+      method: "DELETE",
+      body: JSON.stringify({ password }),
+    };
     if (opts?.idempotencyKey) options.idempotencyKey = opts.idempotencyKey;
     return this.request<void>(`/users/${userId}`, options);
   }
