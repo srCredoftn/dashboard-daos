@@ -14,7 +14,7 @@
     "dev": "pnpm run env:generate && concurrently \"pnpm run dev:backend\" \"pnpm run dev:frontend\"",
     "dev:auto": "node scripts/dev-auto.mjs",
     "dev:backend": "pnpm run dev:backend:express",
-    "dev:backend:express": "tsx backend-express/server.ts",
+    "dev:backend:express": "tsx backend/server.ts",
     "dev:frontend": "vite",
     "dev:frontend-only": "vite",
     "build": "pnpm run build:client && pnpm run build:server",
