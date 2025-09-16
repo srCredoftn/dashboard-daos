@@ -1,25 +1,25 @@
-import { getStorageConfig } from "../backend-express/config/runtime";
-import { connectToDatabase } from "../backend-express/config/database";
+import { getStorageConfig } from "./config/runtime";
+import { connectToDatabase } from "./config/database";
 
 // User repositories
-import type { UserRepository } from "../backend-express/repositories/userRepository";
-import { MemoryUserRepository } from "../backend-express/repositories/memoryUserRepository";
-import { MongoUserRepository } from "../backend-express/repositories/mongoUserRepository";
+import type { UserRepository } from "./repositories/userRepository";
+import { MemoryUserRepository } from "./repositories/memoryUserRepository";
+import { MongoUserRepository } from "./repositories/mongoUserRepository";
 
 // DAO repositories
-import type { DaoRepository } from "../backend-express/repositories/daoRepository";
-import { MemoryDaoRepository } from "../backend-express/repositories/memoryDaoRepository";
-import { MongoDaoRepository } from "../backend-express/repositories/mongoDaoRepository";
+import type { DaoRepository } from "./repositories/daoRepository";
+import { MemoryDaoRepository } from "./repositories/memoryDaoRepository";
+import { MongoDaoRepository } from "./repositories/mongoDaoRepository";
 
 // Comment repositories
-import type { CommentRepository } from "../backend-express/repositories/commentRepository";
-import { MemoryCommentRepository } from "../backend-express/repositories/memoryCommentRepository";
-import { MongoCommentRepository } from "../backend-express/repositories/mongoCommentRepository";
+import type { CommentRepository } from "./repositories/commentRepository";
+import { MemoryCommentRepository } from "./repositories/memoryCommentRepository";
+import { MongoCommentRepository } from "./repositories/mongoCommentRepository";
 
 // Notification repositories
-import type { NotificationRepository } from "../backend-express/repositories/notificationRepository";
-import { MemoryNotificationRepository } from "../backend-express/repositories/memoryNotificationRepository";
-import { MongoNotificationRepository } from "../backend-express/repositories/mongoNotificationRepository";
+import type { NotificationRepository } from "./repositories/notificationRepository";
+import { MemoryNotificationRepository } from "./repositories/memoryNotificationRepository";
+import { MongoNotificationRepository } from "./repositories/mongoNotificationRepository";
 
 // Singleton cache
 let usersRepo: UserRepository | null = null;
