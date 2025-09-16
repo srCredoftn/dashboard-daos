@@ -561,163 +561,279 @@ export class AuthService {
     role: UserRole;
     password?: string;
   }): Promise<User> {
-    await connectToDatabase();
+    try {
+      await connectToDatabase();
 
-    const normalizedName = normalizeName(userData.name);
+      const normalizedName = normalizeName(userData.name);
 
-    const sameName = await UserModel.findOne({
-      isActive: true,
-      name: new RegExp(`^${normalizedName}$`, "i"),
-    }).exec();
-    if (sameName) {
-      throw new Error("User name already taken");
+      const sameName = await UserModel.findOne({
+        isActive: true,
+        name: new RegExp(`^${normalizedName}$`, "i"),
+      }).exec();
+      if (sameName) {
+        throw new Error("User name already taken");
+      }
+
+      const existingUser = await UserModel.findOne({
+        email: userData.email.toLowerCase(),
+      }).exec();
+      if (existingUser) {
+        throw new Error("User already exists");
+      }
+
+      const defaultPassword = userData.password || "changeme123";
+      const passwordHash = await bcrypt.hash(defaultPassword, 12);
+
+      const doc = await UserModel.create({
+        id: new mongoose.Types.ObjectId().toHexString(),
+        name: normalizedName,
+        email: userData.email.toLowerCase(),
+        role: userData.role,
+        createdAt: new Date().toISOString(),
+        isActive: true,
+        passwordHash,
+        isSuperAdmin: userData.role === "admin",
+      });
+
+      devLog.info(`👤 New user created: ${doc.email} Role: ${doc.role}`);
+      if (doc.role === "admin") await refreshSuperAdminCache();
+      return {
+        id: doc.id,
+        name: doc.name,
+        email: doc.email,
+        role: doc.role,
+        createdAt: doc.createdAt,
+        isActive: doc.isActive,
+        lastLogin: doc.lastLogin,
+        isSuperAdmin: doc.isSuperAdmin,
+      };
+    } catch (e) {
+      if (!DEV_FALLBACK_ENABLED) throw e;
+      const normalizedName = normalizeName(userData.name);
+      if (fallbackUsers.some((u) => u.email === userData.email.toLowerCase())) {
+        throw new Error("User already exists");
+      }
+      if (fallbackUsers.some((u) => u.name.toLowerCase() === normalizedName.toLowerCase() && u.isActive)) {
+        throw new Error("User name already taken");
+      }
+      const defaultPassword = userData.password || "changeme123";
+      const passwordHash = await bcrypt.hash(defaultPassword, 12);
+      const id = new mongoose.Types.ObjectId().toHexString();
+      const now = new Date().toISOString();
+      fallbackUsers.push({
+        id,
+        name: normalizedName,
+        email: userData.email.toLowerCase(),
+        role: userData.role,
+        passwordHash,
+        createdAt: now,
+        isActive: true,
+        isSuperAdmin: userData.role === "admin",
+      });
+      devLog.info(`👤 [DEV] New in-memory user created: ${userData.email}`);
+      if (userData.role === "admin") superAdminIdCache = id;
+      return {
+        id,
+        name: normalizedName,
+        email: userData.email.toLowerCase(),
+        role: userData.role,
+        createdAt: now,
+        isActive: true,
+        isSuperAdmin: userData.role === "admin",
+      } as User;
     }
-
-    const existingUser = await UserModel.findOne({
-      email: userData.email.toLowerCase(),
-    }).exec();
-    if (existingUser) {
-      throw new Error("User already exists");
-    }
-
-    const defaultPassword = userData.password || "changeme123";
-    const passwordHash = await bcrypt.hash(defaultPassword, 12);
-
-    const doc = await UserModel.create({
-      id: new mongoose.Types.ObjectId().toHexString(),
-      name: normalizedName,
-      email: userData.email.toLowerCase(),
-      role: userData.role,
-      createdAt: new Date().toISOString(),
-      isActive: true,
-      passwordHash,
-      isSuperAdmin: userData.role === "admin",
-    });
-
-    devLog.info(`👤 New user created: ${doc.email} Role: ${doc.role}`);
-    if (doc.role === "admin") await refreshSuperAdminCache();
-    return {
-      id: doc.id,
-      name: doc.name,
-      email: doc.email,
-      role: doc.role,
-      createdAt: doc.createdAt,
-      isActive: doc.isActive,
-      lastLogin: doc.lastLogin,
-      isSuperAdmin: doc.isSuperAdmin,
-    };
   }
 
   static async updateUserRole(
     id: string,
     role: UserRole,
   ): Promise<User | null> {
-    await connectToDatabase();
-    const doc = await UserModel.findOneAndUpdate(
-      { id },
-      { $set: { role } },
-      { new: true },
-    ).exec();
-    if (!doc) return null;
-    devLog.info(`🔄 User role updated: ${doc.email} → ${role}`);
-    return {
-      id: doc.id,
-      name: doc.name,
-      email: doc.email,
-      role: doc.role,
-      createdAt: doc.createdAt,
-      lastLogin: doc.lastLogin,
-      isActive: doc.isActive,
-      isSuperAdmin: doc.isSuperAdmin,
-    };
+    try {
+      await connectToDatabase();
+      const doc = await UserModel.findOneAndUpdate(
+        { id },
+        { $set: { role } },
+        { new: true },
+      ).exec();
+      if (!doc) return null;
+      devLog.info(`🔄 User role updated: ${doc.email} → ${role}`);
+      return {
+        id: doc.id,
+        name: doc.name,
+        email: doc.email,
+        role: doc.role,
+        createdAt: doc.createdAt,
+        lastLogin: doc.lastLogin,
+        isActive: doc.isActive,
+        isSuperAdmin: doc.isSuperAdmin,
+      };
+    } catch (e) {
+      if (!DEV_FALLBACK_ENABLED) throw e;
+      const u = fallbackUsers.find((x) => x.id === id && x.isActive);
+      if (!u) return null;
+      u.role = role;
+      if (role === "admin") u.isSuperAdmin = true;
+      devLog.info(`🔄 [DEV] In-memory user role updated: ${u.email} → ${role}`);
+      return {
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        createdAt: u.createdAt,
+        lastLogin: u.lastLogin,
+        isActive: u.isActive,
+        isSuperAdmin: Boolean(u.isSuperAdmin),
+      } as User;
+    }
   }
 
   static async deactivateUser(id: string): Promise<boolean> {
-    await connectToDatabase();
-    const doc = await UserModel.findOneAndUpdate(
-      { id },
-      { $set: { isActive: false } },
-      { new: true },
-    ).exec();
-    if (!doc) return false;
+    try {
+      await connectToDatabase();
+      const doc = await UserModel.findOneAndUpdate(
+        { id },
+        { $set: { isActive: false } },
+        { new: true },
+      ).exec();
+      if (!doc) return false;
 
-    for (const token of Array.from(activeSessions)) {
-      try {
-        const decoded = jwt.verify(token, JWT_SECRET as string) as AuthUser;
-        if (decoded.id === id) activeSessions.delete(token);
-      } catch {}
+      for (const token of Array.from(activeSessions)) {
+        try {
+          const decoded = jwt.verify(token, JWT_SECRET as string) as AuthUser;
+          if (decoded.id === id) activeSessions.delete(token);
+        } catch {}
+      }
+
+      devLog.info(`🚫 User deactivated: ${doc.email}`);
+      return true;
+    } catch (e) {
+      if (!DEV_FALLBACK_ENABLED) throw e;
+      const u = fallbackUsers.find((x) => x.id === id && x.isActive);
+      if (!u) return false;
+      u.isActive = false;
+      for (const token of Array.from(activeSessions)) {
+        try {
+          const decoded = jwt.verify(token, JWT_SECRET as string) as AuthUser;
+          if (decoded.id === id) activeSessions.delete(token);
+        } catch {}
+      }
+      devLog.info(`🚫 [DEV] In-memory user deactivated: ${u.email}`);
+      return true;
     }
-
-    devLog.info(`🚫 User deactivated: ${doc.email}`);
-    return true;
   }
 
   static async changePassword(
     id: string,
     newPassword: string,
   ): Promise<boolean> {
-    await connectToDatabase();
-    const doc = await UserModel.findOne({ id, isActive: true }).exec();
-    if (!doc) return false;
-    doc.passwordHash = await bcrypt.hash(newPassword, 12);
-    await doc.save();
-    devLog.info(`🔑 Password changed for: ${doc.email}`);
-    return true;
+    try {
+      await connectToDatabase();
+      const doc = await UserModel.findOne({ id, isActive: true }).exec();
+      if (!doc) return false;
+      doc.passwordHash = await bcrypt.hash(newPassword, 12);
+      await doc.save();
+      devLog.info(`🔑 Password changed for: ${doc.email}`);
+      return true;
+    } catch (e) {
+      if (!DEV_FALLBACK_ENABLED) throw e;
+      const u = fallbackUsers.find((x) => x.id === id && x.isActive);
+      if (!u) return false;
+      u.passwordHash = await bcrypt.hash(newPassword, 12);
+      devLog.info(`🔑 [DEV] Password changed for: ${u.email}`);
+      return true;
+    }
   }
 
   static async updateProfile(
     id: string,
     updates: { name: string; email?: string },
   ): Promise<User | null> {
-    await connectToDatabase();
-    const doc = await UserModel.findOne({ id, isActive: true }).exec();
-    if (!doc) return null;
+    try {
+      await connectToDatabase();
+      const doc = await UserModel.findOne({ id, isActive: true }).exec();
+      if (!doc) return null;
 
-    if (
-      updates.email &&
-      updates.email.toLowerCase() !== doc.email.toLowerCase()
-    ) {
-      throw new Error("Email change not allowed");
+      if (
+        updates.email &&
+        updates.email.toLowerCase() !== doc.email.toLowerCase()
+      ) {
+        throw new Error("Email change not allowed");
+      }
+
+      const normalizedName = normalizeName(updates.name);
+      const conflict = await UserModel.findOne({
+        isActive: true,
+        id: { $ne: id },
+        name: new RegExp(`^${normalizedName}$`, "i"),
+      }).exec();
+      if (conflict) throw new Error("User name already taken");
+
+      doc.name = normalizedName;
+      await doc.save();
+
+      devLog.info(`📝 Profile updated for: ${doc.email}`);
+      return {
+        id: doc.id,
+        name: doc.name,
+        email: doc.email,
+        role: doc.role,
+        createdAt: doc.createdAt,
+        lastLogin: doc.lastLogin,
+        isActive: doc.isActive,
+        isSuperAdmin: doc.isSuperAdmin,
+      };
+    } catch (e) {
+      if (!DEV_FALLBACK_ENABLED) throw e;
+      const u = fallbackUsers.find((x) => x.id === id && x.isActive);
+      if (!u) return null;
+      const normalizedName = normalizeName(updates.name);
+      if (fallbackUsers.some((x) => x.isActive && x.id !== id && x.name.toLowerCase() === normalizedName.toLowerCase())) {
+        throw new Error("User name already taken");
+      }
+      if (updates.email && updates.email.toLowerCase() !== u.email.toLowerCase()) {
+        throw new Error("Email change not allowed");
+      }
+      u.name = normalizedName;
+      devLog.info(`📝 [DEV] Profile updated for: ${u.email}`);
+      return {
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        createdAt: u.createdAt,
+        lastLogin: u.lastLogin,
+        isActive: u.isActive,
+        isSuperAdmin: Boolean(u.isSuperAdmin),
+      } as User;
     }
-
-    const normalizedName = normalizeName(updates.name);
-    const conflict = await UserModel.findOne({
-      isActive: true,
-      id: { $ne: id },
-      name: new RegExp(`^${normalizedName}$`, "i"),
-    }).exec();
-    if (conflict) throw new Error("User name already taken");
-
-    doc.name = normalizedName;
-    await doc.save();
-
-    devLog.info(`📝 Profile updated for: ${doc.email}`);
-    return {
-      id: doc.id,
-      name: doc.name,
-      email: doc.email,
-      role: doc.role,
-      createdAt: doc.createdAt,
-      lastLogin: doc.lastLogin,
-      isActive: doc.isActive,
-      isSuperAdmin: doc.isSuperAdmin,
-    };
   }
 
   static async generateResetToken(email: string): Promise<string | null> {
-    await connectToDatabase();
-    const user = await UserModel.findOne({
-      email: email.toLowerCase(),
-      isActive: true,
-    }).exec();
-    if (!user) return null;
+    try {
+      await connectToDatabase();
+      const user = await UserModel.findOne({
+        email: email.toLowerCase(),
+        isActive: true,
+      }).exec();
+      if (!user) return null;
 
-    const crypto = require("crypto");
-    const token = crypto.randomBytes(32).toString("hex");
-    const expires = new Date(Date.now() + 15 * 60 * 1000);
-    resetTokens[token] = { email: user.email, expires };
-    devLog.info(`🔒 Password reset token generated for: ${user.email}`);
-    return token;
+      const crypto = require("crypto");
+      const token = crypto.randomBytes(32).toString("hex");
+      const expires = new Date(Date.now() + 15 * 60 * 1000);
+      resetTokens[token] = { email: user.email, expires };
+      devLog.info(`🔒 Password reset token generated for: ${user.email}`);
+      return token;
+    } catch (e) {
+      if (!DEV_FALLBACK_ENABLED) throw e;
+      const u = fallbackUsers.find((x) => x.email === email.toLowerCase() && x.isActive);
+      if (!u) return null;
+      const crypto = require("crypto");
+      const token = crypto.randomBytes(32).toString("hex");
+      const expires = new Date(Date.now() + 15 * 60 * 1000);
+      resetTokens[token] = { email: u.email, expires };
+      devLog.info(`🔒 [DEV] Password reset token generated for: ${u.email}`);
+      return token;
+    }
   }
 
   static async verifyResetToken(
@@ -742,19 +858,29 @@ export class AuthService {
     const isValid = await this.verifyResetToken(token, email);
     if (!isValid) return false;
 
-    await connectToDatabase();
-    const user = await UserModel.findOne({
-      email: email.toLowerCase(),
-      isActive: true,
-    }).exec();
-    if (!user) return false;
+    try {
+      await connectToDatabase();
+      const user = await UserModel.findOne({
+        email: email.toLowerCase(),
+        isActive: true,
+      }).exec();
+      if (!user) return false;
 
-    user.passwordHash = await bcrypt.hash(newPassword, 12);
-    await user.save();
+      user.passwordHash = await bcrypt.hash(newPassword, 12);
+      await user.save();
 
-    delete resetTokens[token];
-    devLog.info(`🔑 Password reset successful for: ${user.email}`);
-    return true;
+      delete resetTokens[token];
+      devLog.info(`🔑 Password reset successful for: ${user.email}`);
+      return true;
+    } catch (e) {
+      if (!DEV_FALLBACK_ENABLED) throw e;
+      const u = fallbackUsers.find((x) => x.email === email.toLowerCase() && x.isActive);
+      if (!u) return false;
+      u.passwordHash = await bcrypt.hash(newPassword, 12);
+      delete resetTokens[token];
+      devLog.info(`🔑 [DEV] Password reset successful for: ${u.email}`);
+      return true;
+    }
   }
 
   static getActiveSessionCount(): number {
