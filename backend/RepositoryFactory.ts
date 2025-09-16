@@ -108,4 +108,9 @@ export const RepositoryFactory = {
   },
 };
 
-export type { UserRepository, DaoRepository, CommentRepository, NotificationRepository };
+export type {
+  UserRepository,
+  DaoRepository,
+  CommentRepository,
+  NotificationRepository,
+};
