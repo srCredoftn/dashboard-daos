@@ -33,31 +33,8 @@ const resetTokens: Record<string, { email: string; expires: Date }> = {};
 // Session tracking (ephemeral)
 const activeSessions: Set<string> = new Set();
 
-let userRepo: UserRepository | null = null;
-let attempted = false;
-
 async function getUserRepo(): Promise<UserRepository> {
-  if (userRepo) return userRepo;
-  if (attempted) return userRepo || new MemoryUserRepository();
-  attempted = true;
-
-  const cfg = getStorageConfig();
-  if (!cfg.useMongo) {
-    userRepo = new MemoryUserRepository();
-    return userRepo;
-  }
-  try {
-    await connectToDatabase();
-    userRepo = new MongoUserRepository();
-    return userRepo;
-  } catch (e) {
-    if (cfg.strictDbMode && !cfg.fallbackOnDbError) throw e;
-    devLog.warn(
-      "USE_MONGO=true but DB unreachable, using in-memory users repository",
-    );
-    userRepo = new MemoryUserRepository();
-    return userRepo;
-  }
+  return RepositoryFactory.users();
 }
 
 let superAdminIdCache: string | null = null;
