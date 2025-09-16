@@ -67,18 +67,44 @@ async function refreshSuperAdminCache() {
   try {
     const repo = await getUserRepo();
     const list = await repo.listActive();
-    const envAdmin = process.env.ADMIN_EMAIL?.toLowerCase();
-    if (envAdmin) {
-      const match = list.find(
-        (u) => u.email.toLowerCase() === envAdmin && u.role === "admin",
-      );
-      if (match) {
-        superAdminIdCache = match.id;
-        return;
+
+    // Dedupe by email (keep oldest createdAt)
+    const byEmail = new Map<string, typeof list[number]>();
+    for (const u of list) {
+      const key = u.email.toLowerCase();
+      const prev = byEmail.get(key);
+      if (!prev) byEmail.set(key, u);
+      else {
+        const keep = new Date(prev.createdAt) <= new Date(u.createdAt) ? prev : u;
+        const remove = keep === prev ? u : prev;
+        await repo.deactivateById(remove.id).catch(() => {});
+        byEmail.set(key, keep);
       }
     }
-    const firstAdmin = list.find((u) => u.role === "admin");
-    superAdminIdCache = firstAdmin?.id || null;
+
+    const envAdmin = process.env.ADMIN_EMAIL?.toLowerCase();
+    let chosen: typeof list[number] | undefined;
+    if (envAdmin) {
+      chosen = Array.from(byEmail.values()).find(
+        (u) => u.email.toLowerCase() === envAdmin && u.role === "admin",
+      );
+    }
+    if (!chosen) {
+      chosen = Array.from(byEmail.values()).find((u) => u.role === "admin");
+    }
+
+    // Ensure only one super admin flag
+    if (chosen) {
+      superAdminIdCache = chosen.id;
+      for (const u of byEmail.values()) {
+        const shouldBeSuper = u.id === chosen.id;
+        if (u.isSuperAdmin !== shouldBeSuper) {
+          await repo.updateById(u.id, { isSuperAdmin: shouldBeSuper });
+        }
+      }
+    } else {
+      superAdminIdCache = null;
+    }
   } catch {
     superAdminIdCache = null;
   }
@@ -415,7 +441,7 @@ export class AuthService {
       passwordHash,
     } as any);
 
-    if (created.role === "admin") await refreshSuperAdminCache();
+    await refreshSuperAdminCache();
 
     devLog.info(`👤 New user created: ${created.email} Role: ${created.role}`);
     return {
@@ -440,7 +466,7 @@ export class AuthService {
       isSuperAdmin: role === "admin",
     });
     if (!updated) return null;
-    if (role === "admin") await refreshSuperAdminCache();
+    await refreshSuperAdminCache();
     devLog.info(`🔄 User role updated: ${updated.email} → ${role}`);
     return {
       id: updated.id,
