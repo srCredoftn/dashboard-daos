@@ -1,5 +1,6 @@
 import { getStorageConfig } from "../config/runtime";
 import { connectToDatabase } from "../config/database";
+import { getStorageConfig } from "../config/runtime";
 import type { NotificationRepository, PersistedNotification } from "../repositories/notificationRepository";
 import { MemoryNotificationRepository } from "../repositories/memoryNotificationRepository";
 import { MongoNotificationRepository } from "../repositories/mongoNotificationRepository";
