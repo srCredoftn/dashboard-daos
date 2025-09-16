@@ -1,11 +1,18 @@
-import type { NotificationRepository, PersistedNotification } from "./notificationRepository";
+import type {
+  NotificationRepository,
+  PersistedNotification,
+} from "./notificationRepository";
 
 const store: PersistedNotification[] = [];
 
 export class MemoryNotificationRepository implements NotificationRepository {
   async listForUser(userId: string): Promise<PersistedNotification[]> {
     return store
-      .filter((n) => n.recipients === "all" || (Array.isArray(n.recipients) && n.recipients.includes(userId)))
+      .filter(
+        (n) =>
+          n.recipients === "all" ||
+          (Array.isArray(n.recipients) && n.recipients.includes(userId)),
+      )
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
   async add(n: PersistedNotification): Promise<PersistedNotification> {
@@ -34,7 +41,11 @@ export class MemoryNotificationRepository implements NotificationRepository {
     }
     return count;
   }
-  async clearAll(): Promise<void> { store.splice(0, store.length); }
+  async clearAll(): Promise<void> {
+    store.splice(0, store.length);
+  }
 }
 
-export function __memoryNotifs() { return store; }
+export function __memoryNotifs() {
+  return store;
+}

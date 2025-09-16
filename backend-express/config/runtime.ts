@@ -8,8 +8,10 @@ export type StorageConfig = {
 
 export function getStorageConfig(): StorageConfig {
   const useMongo = (process.env.USE_MONGO || "false").toLowerCase() === "true";
-  const strictDbMode = (process.env.STRICT_DB_MODE || "false").toLowerCase() === "true";
-  const fallbackOnDbError = (process.env.FALLBACK_ON_DB_ERROR || "true").toLowerCase() === "true";
+  const strictDbMode =
+    (process.env.STRICT_DB_MODE || "false").toLowerCase() === "true";
+  const fallbackOnDbError =
+    (process.env.FALLBACK_ON_DB_ERROR || "true").toLowerCase() === "true";
   return { useMongo, strictDbMode, fallbackOnDbError };
 }
 

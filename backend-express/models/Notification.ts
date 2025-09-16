@@ -22,7 +22,8 @@ const NotificationSchema = new Schema<NotificationDocument>({
   createdAt: { type: String, required: true },
 });
 
-const NotificationModel = (mongoose.models.Notification as mongoose.Model<NotificationDocument>) ||
+const NotificationModel =
+  (mongoose.models.Notification as mongoose.Model<NotificationDocument>) ||
   mongoose.model<NotificationDocument>("Notification", NotificationSchema);
 
 export default NotificationModel;

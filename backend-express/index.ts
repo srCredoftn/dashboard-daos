@@ -19,13 +19,17 @@ export function createServer(): express.Application {
   // Optional DB connectivity assertion depending on runtime flags
   (async () => {
     try {
-      const { assertDbConnectivityIfRequired } = await import("./config/runtime");
+      const { assertDbConnectivityIfRequired } = await import(
+        "./config/runtime"
+      );
       await assertDbConnectivityIfRequired();
     } catch (e) {
       console.error((e as Error).message);
       // Fail fast when in strict DB mode without fallback
-      if ((process.env.STRICT_DB_MODE || "false").toLowerCase() === "true" &&
-          (process.env.FALLBACK_ON_DB_ERROR || "true").toLowerCase() !== "true") {
+      if (
+        (process.env.STRICT_DB_MODE || "false").toLowerCase() === "true" &&
+        (process.env.FALLBACK_ON_DB_ERROR || "true").toLowerCase() !== "true"
+      ) {
         // Delay exit slightly to flush logs in some envs
         setTimeout(() => process.exit(1), 10);
       }

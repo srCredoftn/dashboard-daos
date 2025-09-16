@@ -5,7 +5,9 @@ const comments: TaskComment[] = [];
 
 export class MemoryCommentRepository implements CommentRepository {
   async listByDao(daoId: string): Promise<TaskComment[]> {
-    return comments.filter((c) => c.daoId === daoId).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return comments
+      .filter((c) => c.daoId === daoId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
   async listByTask(daoId: string, taskId: number): Promise<TaskComment[]> {
     return comments
@@ -19,7 +21,10 @@ export class MemoryCommentRepository implements CommentRepository {
     comments.push(c);
     return c;
   }
-  async update(id: string, updates: Partial<TaskComment>): Promise<TaskComment | null> {
+  async update(
+    id: string,
+    updates: Partial<TaskComment>,
+  ): Promise<TaskComment | null> {
     const idx = comments.findIndex((c) => c.id === id);
     if (idx === -1) return null;
     comments[idx] = { ...comments[idx], ...updates };
@@ -32,9 +37,16 @@ export class MemoryCommentRepository implements CommentRepository {
     return true;
   }
   async listRecent(limit: number): Promise<TaskComment[]> {
-    return comments.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, limit);
+    return comments
+      .slice()
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, limit);
   }
-  async deleteAll(): Promise<void> { comments.splice(0, comments.length); }
+  async deleteAll(): Promise<void> {
+    comments.splice(0, comments.length);
+  }
 }
 
-export function __memoryComments() { return comments; }
+export function __memoryComments() {
+  return comments;
+}

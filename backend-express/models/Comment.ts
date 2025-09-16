@@ -11,5 +11,7 @@ const CommentSchema = new Schema<TaskComment>({
   createdAt: { type: String, required: true },
 });
 
-const CommentModel = (mongoose.models.Comment as mongoose.Model<TaskComment>) || mongoose.model<TaskComment>("Comment", CommentSchema);
+const CommentModel =
+  (mongoose.models.Comment as mongoose.Model<TaskComment>) ||
+  mongoose.model<TaskComment>("Comment", CommentSchema);
 export default CommentModel;

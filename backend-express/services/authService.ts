@@ -1,11 +1,20 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { devLog, authLog } from "../utils/devLog";
-import type { User, AuthUser, LoginCredentials, AuthResponse, UserRole } from "@shared/dao";
+import type {
+  User,
+  AuthUser,
+  LoginCredentials,
+  AuthResponse,
+  UserRole,
+} from "@shared/dao";
 import mongoose from "mongoose";
 import { connectToDatabase } from "../config/database";
 import { getStorageConfig } from "../config/runtime";
-import type { UserRepository, PersistedUser } from "../repositories/userRepository";
+import type {
+  UserRepository,
+  PersistedUser,
+} from "../repositories/userRepository";
 import { MemoryUserRepository } from "../repositories/memoryUserRepository";
 import { MongoUserRepository } from "../repositories/mongoUserRepository";
 
@@ -14,7 +23,9 @@ const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "24h";
 
 if (!JWT_SECRET || JWT_SECRET.length < 32) {
   devLog.error("🚨 ERREUR CRITIQUE: JWT_SECRET manquant ou trop court");
-  devLog.error("   Veuillez définir une variable d'environnement JWT_SECRET de plus de 32 caractères");
+  devLog.error(
+    "   Veuillez définir une variable d'environnement JWT_SECRET de plus de 32 caractères",
+  );
   process.exit(1);
 }
 
@@ -43,7 +54,9 @@ async function getUserRepo(): Promise<UserRepository> {
     return userRepo;
   } catch (e) {
     if (cfg.strictDbMode && !cfg.fallbackOnDbError) throw e;
-    devLog.warn("USE_MONGO=true but DB unreachable, using in-memory users repository");
+    devLog.warn(
+      "USE_MONGO=true but DB unreachable, using in-memory users repository",
+    );
     userRepo = new MemoryUserRepository();
     return userRepo;
   }
@@ -56,7 +69,9 @@ async function refreshSuperAdminCache() {
     const list = await repo.listActive();
     const envAdmin = process.env.ADMIN_EMAIL?.toLowerCase();
     if (envAdmin) {
-      const match = list.find((u) => u.email.toLowerCase() === envAdmin && u.role === "admin");
+      const match = list.find(
+        (u) => u.email.toLowerCase() === envAdmin && u.role === "admin",
+      );
       if (match) {
         superAdminIdCache = match.id;
         return;
@@ -80,15 +95,31 @@ function normalizeName(name: string): string {
 async function ensureInitialUsers() {
   const repo = await getUserRepo();
 
-  const shouldSeed = process.env.SEED_USERS === "1" || process.env.SEED_USERS === "true";
+  const shouldSeed =
+    process.env.SEED_USERS === "1" || process.env.SEED_USERS === "true";
   if (shouldSeed) {
     if (process.env.NODE_ENV === "production") {
       throw new Error("SEED_USERS ne peut pas être activé en production");
     }
     const defaults = [
-      { name: "Admin User", email: "admin@2snd.fr", role: "admin" as UserRole, password: "admin123" },
-      { name: "Marie Dubois", email: "marie.dubois@2snd.fr", role: "user" as UserRole, password: "marie123" },
-      { name: "Pierre Martin", email: "pierre.martin@2snd.fr", role: "user" as UserRole, password: "pierre123" },
+      {
+        name: "Admin User",
+        email: "admin@2snd.fr",
+        role: "admin" as UserRole,
+        password: "admin123",
+      },
+      {
+        name: "Marie Dubois",
+        email: "marie.dubois@2snd.fr",
+        role: "user" as UserRole,
+        password: "marie123",
+      },
+      {
+        name: "Pierre Martin",
+        email: "pierre.martin@2snd.fr",
+        role: "user" as UserRole,
+        password: "pierre123",
+      },
     ];
     await repo.deleteAll();
     for (const u of defaults) {
@@ -124,7 +155,11 @@ async function ensureInitialUsers() {
       } as any);
       devLog.info(`🔐 Admin user created from environment: ${adminEmail}`);
     } else if (!existing.isSuperAdmin || existing.role !== "admin") {
-      await repo.updateById(existing.id, { isSuperAdmin: true, role: "admin", passwordHash });
+      await repo.updateById(existing.id, {
+        isSuperAdmin: true,
+        role: "admin",
+        passwordHash,
+      });
       devLog.info(`🔐 Admin user ensured from environment: ${adminEmail}`);
     }
     await refreshSuperAdminCache();
@@ -140,11 +175,16 @@ export class AuthService {
     try {
       await ensureInitialUsers();
     } catch (e) {
-      devLog.error("Auth initialization skipped due to DB connectivity issues", e);
+      devLog.error(
+        "Auth initialization skipped due to DB connectivity issues",
+        e,
+      );
     }
   }
 
-  static async login(credentials: LoginCredentials): Promise<AuthResponse | null> {
+  static async login(
+    credentials: LoginCredentials,
+  ): Promise<AuthResponse | null> {
     const email = credentials.email.toLowerCase();
     try {
       const repo = await getUserRepo();
@@ -159,15 +199,26 @@ export class AuthService {
         return null;
       }
 
-      const authUser: AuthUser = { id: user.id, name: user.name, email: user.email, role: user.role };
-      const token = jwt.sign(authUser, JWT_SECRET as jwt.Secret, {
-        expiresIn: JWT_EXPIRES_IN as any,
-        issuer: "dao-management",
-        audience: "dao-app",
-      } as any);
+      const authUser: AuthUser = {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      };
+      const token = jwt.sign(
+        authUser,
+        JWT_SECRET as jwt.Secret,
+        {
+          expiresIn: JWT_EXPIRES_IN as any,
+          issuer: "dao-management",
+          audience: "dao-app",
+        } as any,
+      );
       activeSessions.add(token);
 
-      await (await getUserRepo()).updateById(user.id, { lastLogin: new Date().toISOString() });
+      await (
+        await getUserRepo()
+      ).updateById(user.id, { lastLogin: new Date().toISOString() });
 
       authLog.login(user.email, true);
       return { user: authUser, token };
@@ -179,7 +230,10 @@ export class AuthService {
 
   static async verifyToken(token: string): Promise<AuthUser | null> {
     try {
-      const decoded = jwt.verify(token, JWT_SECRET as string, { issuer: "dao-management", audience: "dao-app" }) as AuthUser;
+      const decoded = jwt.verify(token, JWT_SECRET as string, {
+        issuer: "dao-management",
+        audience: "dao-app",
+      }) as AuthUser;
       try {
         const repo = await getUserRepo();
         const user = await repo.findById(decoded.id);
@@ -200,16 +254,49 @@ export class AuthService {
     }
   }
 
-  static async listActiveSessions(): Promise<{ sessionId: string; user: AuthUser | null; issuedAt?: number; expiresAt?: number }[]> {
+  static async listActiveSessions(): Promise<
+    {
+      sessionId: string;
+      user: AuthUser | null;
+      issuedAt?: number;
+      expiresAt?: number;
+    }[]
+  > {
     const sessions = Array.from(activeSessions);
-    const result: { sessionId: string; user: AuthUser | null; issuedAt?: number; expiresAt?: number }[] = [];
+    const result: {
+      sessionId: string;
+      user: AuthUser | null;
+      issuedAt?: number;
+      expiresAt?: number;
+    }[] = [];
     for (const token of sessions) {
       try {
-        const decoded = jwt.verify(token, JWT_SECRET as string, { issuer: "dao-management", audience: "dao-app" }) as AuthUser & { iat?: number; exp?: number };
-        const sessionId = require("crypto").createHash("sha256").update(token).digest("hex").substring(0, 16);
-        result.push({ sessionId, user: { id: decoded.id, email: decoded.email, role: decoded.role, name: decoded.name }, issuedAt: decoded.iat ? decoded.iat * 1000 : undefined, expiresAt: decoded.exp ? decoded.exp * 1000 : undefined });
+        const decoded = jwt.verify(token, JWT_SECRET as string, {
+          issuer: "dao-management",
+          audience: "dao-app",
+        }) as AuthUser & { iat?: number; exp?: number };
+        const sessionId = require("crypto")
+          .createHash("sha256")
+          .update(token)
+          .digest("hex")
+          .substring(0, 16);
+        result.push({
+          sessionId,
+          user: {
+            id: decoded.id,
+            email: decoded.email,
+            role: decoded.role,
+            name: decoded.name,
+          },
+          issuedAt: decoded.iat ? decoded.iat * 1000 : undefined,
+          expiresAt: decoded.exp ? decoded.exp * 1000 : undefined,
+        });
       } catch {
-        const sessionId = require("crypto").createHash("sha256").update(token).digest("hex").substring(0, 16);
+        const sessionId = require("crypto")
+          .createHash("sha256")
+          .update(token)
+          .digest("hex")
+          .substring(0, 16);
         result.push({ sessionId, user: null });
       }
     }
@@ -227,19 +314,45 @@ export class AuthService {
   static async getAllUsers(): Promise<User[]> {
     const repo = await getUserRepo();
     const docs = await repo.listActive();
-    return docs.map((u) => ({ id: u.id, name: u.name, email: u.email, role: u.role, createdAt: u.createdAt, lastLogin: u.lastLogin, isActive: u.isActive, isSuperAdmin: u.isSuperAdmin }));
+    return docs.map((u) => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      role: u.role,
+      createdAt: u.createdAt,
+      lastLogin: u.lastLogin,
+      isActive: u.isActive,
+      isSuperAdmin: u.isSuperAdmin,
+    }));
   }
 
   static async getUserByEmail(email: string): Promise<User | null> {
     const repo = await getUserRepo();
     const u = await repo.findByEmail(email.toLowerCase());
     if (!u) return null;
-    return { id: u.id, name: u.name, email: u.email, role: u.role, createdAt: u.createdAt, lastLogin: u.lastLogin, isActive: u.isActive, isSuperAdmin: u.isSuperAdmin };
+    return {
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      role: u.role,
+      createdAt: u.createdAt,
+      lastLogin: u.lastLogin,
+      isActive: u.isActive,
+      isSuperAdmin: u.isSuperAdmin,
+    };
   }
 
   static getSuperAdmin(): User | null {
     if (superAdminIdCache) {
-      return { id: superAdminIdCache, name: "Super Admin", email: "", role: "admin", createdAt: "", isActive: true, isSuperAdmin: true } as User;
+      return {
+        id: superAdminIdCache,
+        name: "Super Admin",
+        email: "",
+        role: "admin",
+        createdAt: "",
+        isActive: true,
+        isSuperAdmin: true,
+      } as User;
     }
     return null;
   }
@@ -248,45 +361,97 @@ export class AuthService {
     return superAdminIdCache === userId;
   }
 
-  static async verifyPasswordByEmail(email: string, password: string): Promise<boolean> {
+  static async verifyPasswordByEmail(
+    email: string,
+    password: string,
+  ): Promise<boolean> {
     const repo = await getUserRepo();
     const u = await repo.findByEmail(email.toLowerCase());
     if (!u) return false;
-    try { return await bcrypt.compare(password, u.passwordHash); } catch { return false; }
+    try {
+      return await bcrypt.compare(password, u.passwordHash);
+    } catch {
+      return false;
+    }
   }
 
-  static async verifyPasswordById(id: string, password: string): Promise<boolean> {
+  static async verifyPasswordById(
+    id: string,
+    password: string,
+  ): Promise<boolean> {
     const repo = await getUserRepo();
     const u = await repo.findById(id);
     if (!u) return false;
-    try { return await bcrypt.compare(password, u.passwordHash); } catch { return false; }
+    try {
+      return await bcrypt.compare(password, u.passwordHash);
+    } catch {
+      return false;
+    }
   }
 
-  static async createUser(userData: { name: string; email: string; role: UserRole; password?: string; }): Promise<User> {
+  static async createUser(userData: {
+    name: string;
+    email: string;
+    role: UserRole;
+    password?: string;
+  }): Promise<User> {
     const repo = await getUserRepo();
     const normalizedName = normalizeName(userData.name);
 
     const all = await repo.listActive();
-    if (all.some((x) => x.email.toLowerCase() === userData.email.toLowerCase())) throw new Error("User already exists");
-    if (all.some((x) => x.name.toLowerCase() === normalizedName.toLowerCase())) throw new Error("User name already taken");
+    if (all.some((x) => x.email.toLowerCase() === userData.email.toLowerCase()))
+      throw new Error("User already exists");
+    if (all.some((x) => x.name.toLowerCase() === normalizedName.toLowerCase()))
+      throw new Error("User name already taken");
 
     const defaultPassword = userData.password || "changeme123";
     const passwordHash = await bcrypt.hash(defaultPassword, 12);
-    const created = await repo.create({ name: normalizedName, email: userData.email.toLowerCase(), role: userData.role, isActive: true, isSuperAdmin: userData.role === "admin", passwordHash } as any);
+    const created = await repo.create({
+      name: normalizedName,
+      email: userData.email.toLowerCase(),
+      role: userData.role,
+      isActive: true,
+      isSuperAdmin: userData.role === "admin",
+      passwordHash,
+    } as any);
 
     if (created.role === "admin") await refreshSuperAdminCache();
 
     devLog.info(`👤 New user created: ${created.email} Role: ${created.role}`);
-    return { id: created.id, name: created.name, email: created.email, role: created.role, createdAt: created.createdAt, isActive: created.isActive, lastLogin: created.lastLogin, isSuperAdmin: created.isSuperAdmin };
+    return {
+      id: created.id,
+      name: created.name,
+      email: created.email,
+      role: created.role,
+      createdAt: created.createdAt,
+      isActive: created.isActive,
+      lastLogin: created.lastLogin,
+      isSuperAdmin: created.isSuperAdmin,
+    };
   }
 
-  static async updateUserRole(id: string, role: UserRole): Promise<User | null> {
+  static async updateUserRole(
+    id: string,
+    role: UserRole,
+  ): Promise<User | null> {
     const repo = await getUserRepo();
-    const updated = await repo.updateById(id, { role, isSuperAdmin: role === "admin" });
+    const updated = await repo.updateById(id, {
+      role,
+      isSuperAdmin: role === "admin",
+    });
     if (!updated) return null;
     if (role === "admin") await refreshSuperAdminCache();
     devLog.info(`🔄 User role updated: ${updated.email} → ${role}`);
-    return { id: updated.id, name: updated.name, email: updated.email, role: updated.role, createdAt: updated.createdAt, lastLogin: updated.lastLogin, isActive: updated.isActive, isSuperAdmin: updated.isSuperAdmin };
+    return {
+      id: updated.id,
+      name: updated.name,
+      email: updated.email,
+      role: updated.role,
+      createdAt: updated.createdAt,
+      lastLogin: updated.lastLogin,
+      isActive: updated.isActive,
+      isSuperAdmin: updated.isSuperAdmin,
+    };
   }
 
   static async deactivateUser(id: string): Promise<boolean> {
@@ -294,13 +459,19 @@ export class AuthService {
     const ok = await repo.deactivateById(id);
     if (!ok) return false;
     for (const token of Array.from(activeSessions)) {
-      try { const decoded = jwt.verify(token, JWT_SECRET as string) as AuthUser; if (decoded.id === id) activeSessions.delete(token); } catch {}
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET as string) as AuthUser;
+        if (decoded.id === id) activeSessions.delete(token);
+      } catch {}
     }
     devLog.info(`🚫 User deactivated: ${id}`);
     return true;
   }
 
-  static async changePassword(id: string, newPassword: string): Promise<boolean> {
+  static async changePassword(
+    id: string,
+    newPassword: string,
+  ): Promise<boolean> {
     const repo = await getUserRepo();
     const u = await repo.findById(id);
     if (!u || !u.isActive) return false;
@@ -310,25 +481,43 @@ export class AuthService {
     return true;
   }
 
-  static async updateProfile(id: string, updates: { name: string; email?: string }): Promise<User | null> {
+  static async updateProfile(
+    id: string,
+    updates: { name: string; email?: string },
+  ): Promise<User | null> {
     const repo = await getUserRepo();
     const u = await repo.findById(id);
     if (!u || !u.isActive) return null;
 
-    if (updates.email && updates.email.toLowerCase() !== u.email.toLowerCase()) {
+    if (
+      updates.email &&
+      updates.email.toLowerCase() !== u.email.toLowerCase()
+    ) {
       throw new Error("Email change not allowed");
     }
 
     const normalizedName = normalizeName(updates.name);
     const all = await repo.listActive();
-    const conflict = all.find((x) => x.id !== id && x.name.toLowerCase() === normalizedName.toLowerCase());
+    const conflict = all.find(
+      (x) =>
+        x.id !== id && x.name.toLowerCase() === normalizedName.toLowerCase(),
+    );
     if (conflict) throw new Error("User name already taken");
 
     const updated = await repo.updateById(id, { name: normalizedName });
     if (!updated) return null;
 
     devLog.info(`📝 Profile updated for: ${updated.email}`);
-    return { id: updated.id, name: updated.name, email: updated.email, role: updated.role, createdAt: updated.createdAt, lastLogin: updated.lastLogin, isActive: updated.isActive, isSuperAdmin: updated.isSuperAdmin };
+    return {
+      id: updated.id,
+      name: updated.name,
+      email: updated.email,
+      role: updated.role,
+      createdAt: updated.createdAt,
+      lastLogin: updated.lastLogin,
+      isActive: updated.isActive,
+      isSuperAdmin: updated.isSuperAdmin,
+    };
   }
 
   static async generateResetToken(email: string): Promise<string | null> {
@@ -343,15 +532,25 @@ export class AuthService {
     return token;
   }
 
-  static async verifyResetToken(token: string, email: string): Promise<boolean> {
+  static async verifyResetToken(
+    token: string,
+    email: string,
+  ): Promise<boolean> {
     const resetData = resetTokens[token];
     if (!resetData) return false;
     if (resetData.email.toLowerCase() !== email.toLowerCase()) return false;
-    if (new Date() > resetData.expires) { delete resetTokens[token]; return false; }
+    if (new Date() > resetData.expires) {
+      delete resetTokens[token];
+      return false;
+    }
     return true;
   }
 
-  static async resetPasswordWithToken(token: string, email: string, newPassword: string): Promise<boolean> {
+  static async resetPasswordWithToken(
+    token: string,
+    email: string,
+    newPassword: string,
+  ): Promise<boolean> {
     const isValid = await this.verifyResetToken(token, email);
     if (!isValid) return false;
     const repo = await getUserRepo();
@@ -364,22 +563,32 @@ export class AuthService {
     return true;
   }
 
-  static getActiveSessionCount(): number { return activeSessions.size; }
+  static getActiveSessionCount(): number {
+    return activeSessions.size;
+  }
 
   static cleanupExpiredTokens(): void {
     let cleaned = 0;
     for (const token of Array.from(activeSessions)) {
-      try { jwt.verify(token, JWT_SECRET as string); }
-      catch { activeSessions.delete(token); cleaned++; }
+      try {
+        jwt.verify(token, JWT_SECRET as string);
+      } catch {
+        activeSessions.delete(token);
+        cleaned++;
+      }
     }
     if (cleaned > 0) devLog.info(`🧹 Cleaned ${cleaned} expired tokens`);
   }
 
-  static async clearAllSessions(): Promise<void> { activeSessions.clear(); devLog.info("🧹 All sessions cleared"); }
+  static async clearAllSessions(): Promise<void> {
+    activeSessions.clear();
+    devLog.info("🧹 All sessions cleared");
+  }
 
   static async reinitializeUsers(): Promise<void> {
     const repo = await getUserRepo();
-    const shouldSeed = process.env.SEED_USERS === "1" || process.env.SEED_USERS === "true";
+    const shouldSeed =
+      process.env.SEED_USERS === "1" || process.env.SEED_USERS === "true";
     if (shouldSeed) {
       await repo.deleteAll();
       await ensureInitialUsers();
@@ -403,7 +612,14 @@ export class AuthService {
 AuthService.initialize().catch(console.error);
 
 if (process.env.NODE_ENV === "development") {
-  setInterval(() => { devLog.debug(`📊 Active sessions: ${activeSessions.size}`); }, 30 * 1000);
+  setInterval(() => {
+    devLog.debug(`📊 Active sessions: ${activeSessions.size}`);
+  }, 30 * 1000);
 }
 
-setInterval(() => { AuthService.cleanupExpiredTokens(); }, 60 * 60 * 1000);
+setInterval(
+  () => {
+    AuthService.cleanupExpiredTokens();
+  },
+  60 * 60 * 1000,
+);

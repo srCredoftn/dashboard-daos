@@ -4,11 +4,15 @@ import CommentModel from "../models/Comment";
 
 export class MongoCommentRepository implements CommentRepository {
   async listByDao(daoId: string): Promise<TaskComment[]> {
-    const docs = await CommentModel.find({ daoId }).sort({ createdAt: -1 }).exec();
+    const docs = await CommentModel.find({ daoId })
+      .sort({ createdAt: -1 })
+      .exec();
     return docs.map((d) => d.toObject() as TaskComment);
   }
   async listByTask(daoId: string, taskId: number): Promise<TaskComment[]> {
-    const docs = await CommentModel.find({ daoId, taskId }).sort({ createdAt: -1 }).exec();
+    const docs = await CommentModel.find({ daoId, taskId })
+      .sort({ createdAt: -1 })
+      .exec();
     return docs.map((d) => d.toObject() as TaskComment);
   }
   async getById(id: string): Promise<TaskComment | null> {
@@ -19,8 +23,15 @@ export class MongoCommentRepository implements CommentRepository {
     const created = await CommentModel.create(c as any);
     return created.toObject() as TaskComment;
   }
-  async update(id: string, updates: Partial<TaskComment>): Promise<TaskComment | null> {
-    const updated = await CommentModel.findOneAndUpdate({ id }, { $set: updates }, { new: true }).exec();
+  async update(
+    id: string,
+    updates: Partial<TaskComment>,
+  ): Promise<TaskComment | null> {
+    const updated = await CommentModel.findOneAndUpdate(
+      { id },
+      { $set: updates },
+      { new: true },
+    ).exec();
     return updated ? (updated.toObject() as TaskComment) : null;
   }
   async delete(id: string): Promise<boolean> {
@@ -28,7 +39,10 @@ export class MongoCommentRepository implements CommentRepository {
     return (r.deletedCount || 0) > 0;
   }
   async listRecent(limit: number): Promise<TaskComment[]> {
-    const docs = await CommentModel.find({}).sort({ createdAt: -1 }).limit(limit).exec();
+    const docs = await CommentModel.find({})
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .exec();
     return docs.map((d) => d.toObject() as TaskComment);
   }
   async deleteAll(): Promise<void> {

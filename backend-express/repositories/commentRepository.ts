@@ -5,7 +5,10 @@ export interface CommentRepository {
   listByTask(daoId: string, taskId: number): Promise<TaskComment[]>;
   getById(id: string): Promise<TaskComment | null>;
   add(c: TaskComment): Promise<TaskComment>;
-  update(id: string, updates: Partial<TaskComment>): Promise<TaskComment | null>;
+  update(
+    id: string,
+    updates: Partial<TaskComment>,
+  ): Promise<TaskComment | null>;
   delete(id: string): Promise<boolean>;
   listRecent(limit: number): Promise<TaskComment[]>;
   deleteAll(): Promise<void>;

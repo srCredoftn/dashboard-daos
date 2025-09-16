@@ -1,4 +1,7 @@
-import type { NotificationRepository, PersistedNotification } from "./notificationRepository";
+import type {
+  NotificationRepository,
+  PersistedNotification,
+} from "./notificationRepository";
 import NotificationModel from "../models/Notification";
 
 export class MongoNotificationRepository implements NotificationRepository {
@@ -36,5 +39,7 @@ export class MongoNotificationRepository implements NotificationRepository {
     ).exec();
     return res.modifiedCount || 0;
   }
-  async clearAll(): Promise<void> { await NotificationModel.deleteMany({}).exec(); }
+  async clearAll(): Promise<void> {
+    await NotificationModel.deleteMany({}).exec();
+  }
 }

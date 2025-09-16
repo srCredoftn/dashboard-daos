@@ -4,12 +4,16 @@ import type { PersistedUser, UserRepository } from "./userRepository";
 const users: PersistedUser[] = [];
 
 function genId() {
-  return `user_${Date.now()}_${Math.random().toString(36).slice(2,9)}`;
+  return `user_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 }
 
 export class MemoryUserRepository implements UserRepository {
   async findByEmail(email: string): Promise<PersistedUser | null> {
-    return users.find((u) => u.isActive && u.email.toLowerCase() === email.toLowerCase()) || null;
+    return (
+      users.find(
+        (u) => u.isActive && u.email.toLowerCase() === email.toLowerCase(),
+      ) || null
+    );
   }
   async findById(id: string): Promise<PersistedUser | null> {
     return users.find((u) => u.isActive && u.id === id) || null;
@@ -17,7 +21,12 @@ export class MemoryUserRepository implements UserRepository {
   async listActive(): Promise<PersistedUser[]> {
     return users.filter((u) => u.isActive);
   }
-  async create(u: Omit<PersistedUser, "id" | "createdAt"> & { id?: string; createdAt?: string }): Promise<PersistedUser> {
+  async create(
+    u: Omit<PersistedUser, "id" | "createdAt"> & {
+      id?: string;
+      createdAt?: string;
+    },
+  ): Promise<PersistedUser> {
     const doc: PersistedUser = {
       id: u.id || genId(),
       name: u.name,
@@ -32,7 +41,10 @@ export class MemoryUserRepository implements UserRepository {
     users.push(doc);
     return doc;
   }
-  async updateById(id: string, updates: Partial<Omit<PersistedUser, "id" | "email" | "createdAt">>): Promise<PersistedUser | null> {
+  async updateById(
+    id: string,
+    updates: Partial<Omit<PersistedUser, "id" | "email" | "createdAt">>,
+  ): Promise<PersistedUser | null> {
     const idx = users.findIndex((u) => u.id === id && u.isActive);
     if (idx === -1) return null;
     users[idx] = { ...users[idx], ...updates };

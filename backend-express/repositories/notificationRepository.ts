@@ -26,7 +26,8 @@ export interface ServerNotification {
   createdAt: string;
 }
 
-export interface PersistedNotification extends Omit<ServerNotification, "readBy"> {
+export interface PersistedNotification
+  extends Omit<ServerNotification, "readBy"> {
   readBy: string[];
 }
 
