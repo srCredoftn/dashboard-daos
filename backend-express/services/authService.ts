@@ -106,10 +106,20 @@ function normalizeName(name: string): string {
 }
 
 async function ensureInitialUsers() {
-  await connectToDatabase().catch((e) => {
+  try {
+    await connectToDatabase();
+  } catch (e) {
     devLog.error("MongoDB indisponible pour l'authentification", e);
+    if (DEV_FALLBACK_ENABLED) {
+      const admin = fallbackUsers.find((u) => u.isSuperAdmin);
+      if (admin) {
+        superAdminIdCache = admin.id;
+        devLog.info("🔐 Dev auth fallback active with in-memory admin user");
+        return;
+      }
+    }
     throw e;
-  });
+  }
 
   const shouldSeed =
     process.env.SEED_USERS === "1" || process.env.SEED_USERS === "true";
@@ -492,22 +502,32 @@ export class AuthService {
   }
 
   static isSuperAdmin(userId: string): boolean {
-    return Boolean(superAdminIdCache && superAdminIdCache === userId);
+    if (superAdminIdCache && superAdminIdCache === userId) return true;
+    if (DEV_FALLBACK_ENABLED) {
+      const u = fallbackUsers.find((x) => x.id === userId && x.isActive);
+      return Boolean(u?.isSuperAdmin);
+    }
+    return false;
   }
 
   static async verifyPasswordByEmail(
     email: string,
     password: string,
   ): Promise<boolean> {
-    await connectToDatabase();
-    const user = await UserModel.findOne({
-      email: email.toLowerCase(),
-      isActive: true,
-    }).exec();
-    if (!user) return false;
     try {
+      await connectToDatabase();
+      const user = await UserModel.findOne({
+        email: email.toLowerCase(),
+        isActive: true,
+      }).exec();
+      if (!user) return false;
       return await bcrypt.compare(password, user.passwordHash);
-    } catch {
+    } catch (_) {
+      if (DEV_FALLBACK_ENABLED) {
+        const u = fallbackUsers.find((x) => x.email === email.toLowerCase() && x.isActive);
+        if (!u) return false;
+        try { return await bcrypt.compare(password, u.passwordHash); } catch { return false; }
+      }
       return false;
     }
   }
@@ -516,12 +536,17 @@ export class AuthService {
     id: string,
     password: string,
   ): Promise<boolean> {
-    await connectToDatabase();
-    const user = await UserModel.findOne({ id, isActive: true }).exec();
-    if (!user) return false;
     try {
+      await connectToDatabase();
+      const user = await UserModel.findOne({ id, isActive: true }).exec();
+      if (!user) return false;
       return await bcrypt.compare(password, user.passwordHash);
-    } catch {
+    } catch (_) {
+      if (DEV_FALLBACK_ENABLED) {
+        const u = fallbackUsers.find((x) => x.id === id && x.isActive);
+        if (!u) return false;
+        try { return await bcrypt.compare(password, u.passwordHash); } catch { return false; }
+      }
       return false;
     }
   }
