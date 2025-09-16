@@ -67,7 +67,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     const serverNotifsRaw = await notificationsApi.list();
     const serverNotifs: ServerNotification[] = Array.isArray(serverNotifsRaw)
       ? serverNotifsRaw
-      : (serverNotifsRaw as any)?.items && Array.isArray((serverNotifsRaw as any).items)
+      : (serverNotifsRaw as any)?.items &&
+          Array.isArray((serverNotifsRaw as any).items)
         ? (serverNotifsRaw as any).items
         : [];
 

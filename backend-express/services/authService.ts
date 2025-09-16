@@ -69,13 +69,14 @@ async function refreshSuperAdminCache() {
     const list = await repo.listActive();
 
     // Dedupe by email (keep oldest createdAt)
-    const byEmail = new Map<string, typeof list[number]>();
+    const byEmail = new Map<string, (typeof list)[number]>();
     for (const u of list) {
       const key = u.email.toLowerCase();
       const prev = byEmail.get(key);
       if (!prev) byEmail.set(key, u);
       else {
-        const keep = new Date(prev.createdAt) <= new Date(u.createdAt) ? prev : u;
+        const keep =
+          new Date(prev.createdAt) <= new Date(u.createdAt) ? prev : u;
         const remove = keep === prev ? u : prev;
         await repo.deactivateById(remove.id).catch(() => {});
         byEmail.set(key, keep);
@@ -83,7 +84,7 @@ async function refreshSuperAdminCache() {
     }
 
     const envAdmin = process.env.ADMIN_EMAIL?.toLowerCase();
-    let chosen: typeof list[number] | undefined;
+    let chosen: (typeof list)[number] | undefined;
     if (envAdmin) {
       chosen = Array.from(byEmail.values()).find(
         (u) => u.email.toLowerCase() === envAdmin && u.role === "admin",

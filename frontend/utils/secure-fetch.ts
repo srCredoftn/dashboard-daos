@@ -2,7 +2,7 @@
 
 // Utilitaire: créer un fetch natif via un iframe PERSISTANT pour éviter les interceptions
 let __nativeIframe: HTMLIFrameElement | null = null;
-let __iframeBoundFetch: (typeof fetch) | null = null;
+let __iframeBoundFetch: typeof fetch | null = null;
 function createFreshNativeFetch(): typeof fetch {
   if (typeof window === "undefined") {
     return (globalThis.fetch || fetch).bind(globalThis as any);
@@ -18,7 +18,9 @@ function createFreshNativeFetch(): typeof fetch {
       __iframeBoundFetch = null; // reset cache to bind to new cw
     }
 
-    const cw = __nativeIframe.contentWindow as (Window & { fetch: typeof fetch }) | null;
+    const cw = __nativeIframe.contentWindow as
+      | (Window & { fetch: typeof fetch })
+      | null;
     if (cw && typeof cw.fetch === "function") {
       if (!__iframeBoundFetch) {
         __iframeBoundFetch = cw.fetch.bind(cw);

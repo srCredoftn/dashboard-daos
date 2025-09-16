@@ -44,7 +44,12 @@ export class MemoryUserRepository implements UserRepository {
     );
     if (existingIdx !== -1) {
       // Merge/refresh existing instead of creating a duplicate
-      users[existingIdx] = { ...users[existingIdx], ...doc, id: users[existingIdx].id, createdAt: users[existingIdx].createdAt };
+      users[existingIdx] = {
+        ...users[existingIdx],
+        ...doc,
+        id: users[existingIdx].id,
+        createdAt: users[existingIdx].createdAt,
+      };
       return users[existingIdx];
     }
     users.push(doc);
