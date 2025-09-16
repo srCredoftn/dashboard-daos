@@ -1,11 +1,9 @@
 import { getStorageConfig } from "../config/runtime";
-import { connectToDatabase } from "../config/database";
 import type {
   NotificationRepository,
   PersistedNotification,
 } from "../repositories/notificationRepository";
-import { MemoryNotificationRepository } from "../repositories/memoryNotificationRepository";
-import { MongoNotificationRepository } from "../repositories/mongoNotificationRepository";
+import { RepositoryFactory } from "../../backend/RepositoryFactory";
 
 export type NotificationType =
   | "role_update"
