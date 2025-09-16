@@ -1,31 +1,10 @@
 import type { TaskComment } from "@shared/dao";
-import { getStorageConfig } from "../config/runtime";
-import { connectToDatabase } from "../config/database";
 import type { TaskComment } from "@shared/dao";
 import type { CommentRepository } from "../repositories/commentRepository";
-import { MemoryCommentRepository } from "../repositories/memoryCommentRepository";
-import { MongoCommentRepository } from "../repositories/mongoCommentRepository";
+import { RepositoryFactory } from "../../backend/RepositoryFactory";
 
-let repo: CommentRepository | null = null;
-let attempted = false;
 async function getRepo(): Promise<CommentRepository> {
-  if (repo) return repo;
-  if (attempted) return repo || new MemoryCommentRepository();
-  attempted = true;
-  const cfg = getStorageConfig();
-  if (!cfg.useMongo) {
-    repo = new MemoryCommentRepository();
-    return repo;
-  }
-  try {
-    await connectToDatabase();
-    repo = new MongoCommentRepository();
-    return repo;
-  } catch (e) {
-    if (cfg.strictDbMode && !cfg.fallbackOnDbError) throw e;
-    repo = new MemoryCommentRepository();
-    return repo;
-  }
+  return RepositoryFactory.comments();
 }
 
 export class CommentService {
