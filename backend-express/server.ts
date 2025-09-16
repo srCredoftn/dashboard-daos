@@ -3,7 +3,7 @@ import { createServer } from "./index.js";
 import { logger } from "./utils/logger.js";
 
 const app = createServer();
-const PORT = process.env.PORT || 3001;
+const PORT = Number(process.env.BACKEND_PORT || 3001);
 
 app.listen(PORT, () => {
   logger.info(`🚀 Secure backend server running on port ${PORT}`, "SERVER");
