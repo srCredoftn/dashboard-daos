@@ -33,26 +33,8 @@ export interface ServerNotification {
   createdAt: string;
 }
 
-let repo: NotificationRepository | null = null;
-let attempted = false;
 async function getRepo(): Promise<NotificationRepository> {
-  if (repo) return repo;
-  if (attempted) return repo || new MemoryNotificationRepository();
-  attempted = true;
-  const cfg = getStorageConfig();
-  if (!cfg.useMongo) {
-    repo = new MemoryNotificationRepository();
-    return repo;
-  }
-  try {
-    await connectToDatabase();
-    repo = new MongoNotificationRepository();
-    return repo;
-  } catch (e) {
-    if (cfg.strictDbMode && !cfg.fallbackOnDbError) throw e;
-    repo = new MemoryNotificationRepository();
-    return repo;
-  }
+  return RepositoryFactory.notifications();
 }
 
 class NotificationServiceClass {
