@@ -5,9 +5,13 @@ import { NotificationService } from "../services/notificationService";
 const router = express.Router();
 
 // GET /api/notifications - list current user's notifications
-router.get("/", authenticate, (req, res) => {
-  const list = NotificationService.listForUser(req.user!.id);
-  return res.json(list);
+router.get("/", authenticate, async (req, res) => {
+  try {
+    const list = await NotificationService.listForUser(req.user!.id);
+    return res.json(list);
+  } catch (e) {
+    return res.status(500).json({ ok: false, error: (e as Error).message });
+  }
 });
 
 // PUT /api/notifications/:id/read - mark one as read

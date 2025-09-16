@@ -1,6 +1,5 @@
 import { getStorageConfig } from "../config/runtime";
 import { connectToDatabase } from "../config/database";
-import { getStorageConfig } from "../config/runtime";
 import type {
   NotificationRepository,
   PersistedNotification,

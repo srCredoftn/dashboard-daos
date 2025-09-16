@@ -27,17 +27,27 @@ export class MongoUserRepository implements UserRepository {
       createdAt?: string;
     },
   ): Promise<PersistedUser> {
-    const doc = await UserModel.create({
-      id: u.id || new mongoose.Types.ObjectId().toHexString(),
-      name: u.name,
-      email: u.email.toLowerCase(),
-      role: u.role,
-      createdAt: u.createdAt || new Date().toISOString(),
-      isActive: true,
-      isSuperAdmin: Boolean(u.isSuperAdmin),
-      passwordHash: u.passwordHash,
-    });
-    return doc.toObject() as PersistedUser;
+    const now = new Date().toISOString();
+    const email = u.email.toLowerCase();
+    const update = {
+      $set: {
+        name: u.name,
+        role: u.role,
+        isActive: true,
+        isSuperAdmin: Boolean(u.isSuperAdmin),
+        passwordHash: u.passwordHash,
+      },
+      $setOnInsert: {
+        id: u.id || new mongoose.Types.ObjectId().toHexString(),
+        email,
+        createdAt: u.createdAt || now,
+      },
+    } as any;
+    const updated = await UserModel.findOneAndUpdate({ email }, update, {
+      upsert: true,
+      new: true,
+    }).exec();
+    return updated!.toObject() as PersistedUser;
   }
   async updateById(
     id: string,

@@ -1,16 +1,42 @@
 // Utilitaire pour créer un fetch sécurisé qui évite les interceptions de services tiers
 
-// Utilitaire: créer un fetch natif frais via un iframe (évite les références périmées)
+// Utilitaire: créer un fetch natif via un iframe PERSISTANT pour éviter les interceptions
+let __nativeIframe: HTMLIFrameElement | null = null;
+let __iframeBoundFetch: typeof fetch | null = null;
 function createFreshNativeFetch(): typeof fetch {
-  // Simpler and more reliable: prefer the browser's fetch bound to window.
-  // The iframe trick caused cross-origin/contentWindow issues in some environments.
-  if (typeof window === "undefined" || !window.fetch) {
+  if (typeof window === "undefined") {
     return (globalThis.fetch || fetch).bind(globalThis as any);
   }
   try {
-    return window.fetch.bind(window);
+    if (!__nativeIframe || !document.body.contains(__nativeIframe)) {
+      const iframe = document.createElement("iframe");
+      iframe.style.display = "none";
+      iframe.src = "about:blank"; // même-origine
+      // Utiliser body si disponible, sinon documentElement
+      (document.body || document.documentElement).appendChild(iframe);
+      __nativeIframe = iframe;
+      __iframeBoundFetch = null; // reset cache to bind to new cw
+    }
+
+    const cw = __nativeIframe.contentWindow as
+      | (Window & { fetch: typeof fetch })
+      | null;
+    if (cw && typeof cw.fetch === "function") {
+      if (!__iframeBoundFetch) {
+        __iframeBoundFetch = cw.fetch.bind(cw);
+      }
+      return __iframeBoundFetch;
+    }
   } catch (error) {
-    console.warn("createFreshNativeFetch fallback to global fetch:", error);
+    console.warn(
+      "createFreshNativeFetch: persistent iframe strategy failed, falling back:",
+      error,
+    );
+  }
+  // Fallback: utiliser la ref globale (peut être interceptée, mais mieux que rien)
+  try {
+    return (window.fetch || (globalThis.fetch as any)).bind(window as any);
+  } catch (e) {
     return (globalThis.fetch || fetch).bind(globalThis as any);
   }
 }
@@ -165,7 +191,7 @@ export class SecureFetch {
             fetchFunction = this.getFreshNativeFetch();
             usedFreshNative = true;
           } else if (!this.isNativeFetch() && !forceWindowFetch) {
-            // Si window.fetch est intercepté, utiliser natif frais
+            // Si window.fetch est intercept��, utiliser natif frais
             fetchFunction = this.getFreshNativeFetch();
             usedFreshNative = true;
           } else if (!forceWindowFetch) {

@@ -38,6 +38,20 @@ export class MemoryUserRepository implements UserRepository {
       passwordHash: u.passwordHash,
       lastLogin: u.lastLogin,
     };
+    // Enforce unique email (active)
+    const existingIdx = users.findIndex(
+      (x) => x.isActive && x.email.toLowerCase() === doc.email.toLowerCase(),
+    );
+    if (existingIdx !== -1) {
+      // Merge/refresh existing instead of creating a duplicate
+      users[existingIdx] = {
+        ...users[existingIdx],
+        ...doc,
+        id: users[existingIdx].id,
+        createdAt: users[existingIdx].createdAt,
+      };
+      return users[existingIdx];
+    }
     users.push(doc);
     return doc;
   }
