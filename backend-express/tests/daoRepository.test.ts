@@ -27,7 +27,9 @@ describe("MemoryDaoRepository", () => {
   });
 
   it("creates, reads, updates and deletes DAOs", async () => {
-    const created = await repo.insert(sampleDao({ numeroListe: "DAO-2099-010" }));
+    const created = await repo.insert(
+      sampleDao({ numeroListe: "DAO-2099-010" }),
+    );
     expect(created.id).toBeTruthy();
 
     const fetched = await repo.findById(created.id);
@@ -47,11 +49,21 @@ describe("MemoryDaoRepository", () => {
 
   it("paginates and filters", async () => {
     await repo.deleteAll();
-    await repo.insert(sampleDao({ numeroListe: "DAO-2099-001", autoriteContractante: "A" }));
-    await repo.insert(sampleDao({ numeroListe: "DAO-2099-002", autoriteContractante: "B" }));
-    await repo.insert(sampleDao({ numeroListe: "DAO-2099-003", autoriteContractante: "A" }));
+    await repo.insert(
+      sampleDao({ numeroListe: "DAO-2099-001", autoriteContractante: "A" }),
+    );
+    await repo.insert(
+      sampleDao({ numeroListe: "DAO-2099-002", autoriteContractante: "B" }),
+    );
+    await repo.insert(
+      sampleDao({ numeroListe: "DAO-2099-003", autoriteContractante: "A" }),
+    );
 
-    const { items, total } = await repo.findAndPaginate({ autorite: "A", page: 1, pageSize: 10 });
+    const { items, total } = await repo.findAndPaginate({
+      autorite: "A",
+      page: 1,
+      pageSize: 10,
+    });
     expect(total).toBe(2);
     expect(items.every((d) => d.autoriteContractante === "A")).toBe(true);
   });
@@ -82,7 +94,9 @@ describe("DaoService with USE_MONGO toggle", () => {
     process.env.USE_MONGO = "true";
     vi.resetModules();
     vi.mock("../config/database", () => ({
-      connectToDatabase: vi.fn(async () => { throw new Error("no mongo"); }),
+      connectToDatabase: vi.fn(async () => {
+        throw new Error("no mongo");
+      }),
     }));
 
     const { DaoService } = await import("../services/daoService");

@@ -11,7 +11,7 @@ export class MongoDaoRepository implements DaoRepository {
   async findById(id: string): Promise<Dao | null> {
     const doc = await DaoModel.findOne({ id });
     return doc ? (doc.toObject() as Dao) : null;
-    }
+  }
 
   async getLastCreated(): Promise<Dao | null> {
     const doc = await DaoModel.findOne().sort({ createdAt: -1 });
@@ -22,7 +22,9 @@ export class MongoDaoRepository implements DaoRepository {
     return DaoModel.countDocuments();
   }
 
-  async findAndPaginate(opts: DaoQueryOptions): Promise<{ items: Dao[]; total: number }> {
+  async findAndPaginate(
+    opts: DaoQueryOptions,
+  ): Promise<{ items: Dao[]; total: number }> {
     const {
       search,
       autorite,
@@ -70,12 +72,17 @@ export class MongoDaoRepository implements DaoRepository {
     sortObj[sort] = order === "asc" ? 1 : -1;
 
     const skip = Math.max(0, (Math.max(1, page) - 1) * pageSize);
-    const docs = await DaoModel.find(query).sort(sortObj).skip(skip).limit(pageSize);
+    const docs = await DaoModel.find(query)
+      .sort(sortObj)
+      .skip(skip)
+      .limit(pageSize);
     return { items: docs.map((d) => d.toObject() as Dao), total };
   }
 
   async findByNumeroYear(year: number | string): Promise<Dao[]> {
-    const docs = await DaoModel.find({ numeroListe: { $regex: `^DAO-${year}-` } });
+    const docs = await DaoModel.find({
+      numeroListe: { $regex: `^DAO-${year}-` },
+    });
     return docs.map((d) => d.toObject() as Dao);
   }
 

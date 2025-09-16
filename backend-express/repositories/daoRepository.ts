@@ -18,7 +18,9 @@ export type DaoQueryOptions = {
 export interface DaoRepository {
   findAll(): Promise<Dao[]>;
   findById(id: string): Promise<Dao | null>;
-  findAndPaginate(opts: DaoQueryOptions): Promise<{ items: Dao[]; total: number }>;
+  findAndPaginate(
+    opts: DaoQueryOptions,
+  ): Promise<{ items: Dao[]; total: number }>;
   findByNumeroYear(year: number | string): Promise<Dao[]>;
   getLastCreated(): Promise<Dao | null>;
   count(): Promise<number>;

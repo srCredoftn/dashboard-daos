@@ -26,7 +26,10 @@ async function getRepo(): Promise<DaoRepository> {
     repo = new MongoDaoRepository();
     return repo;
   } catch (e) {
-    console.warn("⚠️ USE_MONGO=true but MongoDB not available, falling back to in-memory repository:", String(e));
+    console.warn(
+      "⚠️ USE_MONGO=true but MongoDB not available, falling back to in-memory repository:",
+      String(e),
+    );
     repo = new MemoryDaoRepository();
     return repo;
   }
@@ -119,7 +122,7 @@ export class DaoService {
 
   // Create new DAO
   static async createDao(
-    daoData: Omit<Dao, "id" | "createdAt" | "updatedAt">
+    daoData: Omit<Dao, "id" | "createdAt" | "updatedAt">,
   ): Promise<Dao> {
     const r = await getRepo();
     const id = Date.now().toString();
@@ -160,7 +163,10 @@ export class DaoService {
   }
 
   // Update DAO
-  static async updateDao(id: string, updates: Partial<Dao>): Promise<Dao | null> {
+  static async updateDao(
+    id: string,
+    updates: Partial<Dao>,
+  ): Promise<Dao | null> {
     const r = await getRepo();
     return r.update(id, { ...updates, updatedAt: new Date().toISOString() });
   }
@@ -197,7 +203,8 @@ export class DaoService {
   // Clear all DAOs (DB or in-memory)
   static async clearAll(): Promise<void> {
     const r = await getRepo();
-    for (const k of Object.keys(lastIssuedSeqByYear)) delete lastIssuedSeqByYear[k];
+    for (const k of Object.keys(lastIssuedSeqByYear))
+      delete lastIssuedSeqByYear[k];
     await r.deleteAll();
   }
 }

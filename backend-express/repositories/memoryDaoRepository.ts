@@ -22,7 +22,9 @@ export class MemoryDaoRepository implements DaoRepository {
     return daoStorage.size();
   }
 
-  async findAndPaginate(opts: DaoQueryOptions): Promise<{ items: Dao[]; total: number }> {
+  async findAndPaginate(
+    opts: DaoQueryOptions,
+  ): Promise<{ items: Dao[]; total: number }> {
     const {
       search,
       autorite,
@@ -43,7 +45,8 @@ export class MemoryDaoRepository implements DaoRepository {
           (d.numeroListe && d.numeroListe.toLowerCase().includes(q)) ||
           (d.objetDossier && d.objetDossier.toLowerCase().includes(q)) ||
           (d.reference && d.reference.toLowerCase().includes(q)) ||
-          (d.autoriteContractante && d.autoriteContractante.toLowerCase().includes(q))
+          (d.autoriteContractante &&
+            d.autoriteContractante.toLowerCase().includes(q))
         );
       });
     }
@@ -69,7 +72,8 @@ export class MemoryDaoRepository implements DaoRepository {
     list.sort((a: any, b: any) => {
       const av = (a as any)[sort] || "";
       const bv = (b as any)[sort] || "";
-      if (typeof av === "string" && typeof bv === "string") return direction * av.localeCompare(bv);
+      if (typeof av === "string" && typeof bv === "string")
+        return direction * av.localeCompare(bv);
       if (av < bv) return -1 * direction;
       if (av > bv) return 1 * direction;
       return 0;

@@ -43,6 +43,8 @@ const DaoSchema = new Schema<Dao>(
 );
 
 // Create and export the model (reuse if already compiled to avoid OverwriteModelError in tests)
-const DaoModel = (mongoose.models.Dao as mongoose.Model<Dao>) || mongoose.model<Dao>("Dao", DaoSchema);
+const DaoModel =
+  (mongoose.models.Dao as mongoose.Model<Dao>) ||
+  mongoose.model<Dao>("Dao", DaoSchema);
 
 export default DaoModel;

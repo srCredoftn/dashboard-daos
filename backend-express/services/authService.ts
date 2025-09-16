@@ -14,8 +14,8 @@ import UserModel, { type UserDocument } from "../models/User";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const DEV_FALLBACK_ENABLED =
-  ((process.env.ALLOW_DEV_AUTH_FALLBACK || "true").toLowerCase() ===
-    "true" && process.env.NODE_ENV !== "production");
+  (process.env.ALLOW_DEV_AUTH_FALLBACK || "true").toLowerCase() === "true" &&
+  process.env.NODE_ENV !== "production";
 
 // In-memory fallback users for development when MongoDB is unavailable
 const fallbackUsers: Array<{
@@ -35,9 +35,24 @@ function seedFallbackUsers() {
   if (fallbackUsers.length > 0) return;
   const now = new Date().toISOString();
   const demo = [
-    { name: "Admin User", email: "admin@2snd.fr", role: "admin" as UserRole, password: "admin123" },
-    { name: "Marie Dubois", email: "marie.dubois@2snd.fr", role: "user" as UserRole, password: "marie123" },
-    { name: "Pierre Martin", email: "pierre.martin@2snd.fr", role: "user" as UserRole, password: "pierre123" },
+    {
+      name: "Admin User",
+      email: "admin@2snd.fr",
+      role: "admin" as UserRole,
+      password: "admin123",
+    },
+    {
+      name: "Marie Dubois",
+      email: "marie.dubois@2snd.fr",
+      role: "user" as UserRole,
+      password: "marie123",
+    },
+    {
+      name: "Pierre Martin",
+      email: "pierre.martin@2snd.fr",
+      role: "user" as UserRole,
+      password: "pierre123",
+    },
   ];
   for (const u of demo) {
     const id = new mongoose.Types.ObjectId().toHexString();
@@ -326,7 +341,9 @@ export class AuthService {
         return decoded;
       } catch (dbErr) {
         if (DEV_FALLBACK_ENABLED) {
-          const u = fallbackUsers.find((x) => x.id === decoded.id && x.isActive);
+          const u = fallbackUsers.find(
+            (x) => x.id === decoded.id && x.isActive,
+          );
           if (u) {
             if (!activeSessions.has(token)) activeSessions.add(token);
             authLog.tokenVerification(u.email, true);
@@ -421,16 +438,19 @@ export class AuthService {
       if (DEV_FALLBACK_ENABLED) {
         return fallbackUsers
           .filter((u) => u.isActive)
-          .map((u) => ({
-            id: u.id,
-            name: u.name,
-            email: u.email,
-            role: u.role,
-            createdAt: u.createdAt,
-            lastLogin: u.lastLogin,
-            isActive: u.isActive,
-            isSuperAdmin: Boolean(u.isSuperAdmin),
-          } as User));
+          .map(
+            (u) =>
+              ({
+                id: u.id,
+                name: u.name,
+                email: u.email,
+                role: u.role,
+                createdAt: u.createdAt,
+                lastLogin: u.lastLogin,
+                isActive: u.isActive,
+                isSuperAdmin: Boolean(u.isSuperAdmin),
+              }) as User,
+          );
       }
       throw _;
     }
@@ -528,9 +548,15 @@ export class AuthService {
       return await bcrypt.compare(password, user.passwordHash);
     } catch (_) {
       if (DEV_FALLBACK_ENABLED) {
-        const u = fallbackUsers.find((x) => x.email === email.toLowerCase() && x.isActive);
+        const u = fallbackUsers.find(
+          (x) => x.email === email.toLowerCase() && x.isActive,
+        );
         if (!u) return false;
-        try { return await bcrypt.compare(password, u.passwordHash); } catch { return false; }
+        try {
+          return await bcrypt.compare(password, u.passwordHash);
+        } catch {
+          return false;
+        }
       }
       return false;
     }
@@ -549,7 +575,11 @@ export class AuthService {
       if (DEV_FALLBACK_ENABLED) {
         const u = fallbackUsers.find((x) => x.id === id && x.isActive);
         if (!u) return false;
-        try { return await bcrypt.compare(password, u.passwordHash); } catch { return false; }
+        try {
+          return await bcrypt.compare(password, u.passwordHash);
+        } catch {
+          return false;
+        }
       }
       return false;
     }
@@ -613,7 +643,12 @@ export class AuthService {
       if (fallbackUsers.some((u) => u.email === userData.email.toLowerCase())) {
         throw new Error("User already exists");
       }
-      if (fallbackUsers.some((u) => u.name.toLowerCase() === normalizedName.toLowerCase() && u.isActive)) {
+      if (
+        fallbackUsers.some(
+          (u) =>
+            u.name.toLowerCase() === normalizedName.toLowerCase() && u.isActive,
+        )
+      ) {
         throw new Error("User name already taken");
       }
       const defaultPassword = userData.password || "changeme123";
@@ -787,10 +822,20 @@ export class AuthService {
       const u = fallbackUsers.find((x) => x.id === id && x.isActive);
       if (!u) return null;
       const normalizedName = normalizeName(updates.name);
-      if (fallbackUsers.some((x) => x.isActive && x.id !== id && x.name.toLowerCase() === normalizedName.toLowerCase())) {
+      if (
+        fallbackUsers.some(
+          (x) =>
+            x.isActive &&
+            x.id !== id &&
+            x.name.toLowerCase() === normalizedName.toLowerCase(),
+        )
+      ) {
         throw new Error("User name already taken");
       }
-      if (updates.email && updates.email.toLowerCase() !== u.email.toLowerCase()) {
+      if (
+        updates.email &&
+        updates.email.toLowerCase() !== u.email.toLowerCase()
+      ) {
         throw new Error("Email change not allowed");
       }
       u.name = normalizedName;
@@ -825,7 +870,9 @@ export class AuthService {
       return token;
     } catch (e) {
       if (!DEV_FALLBACK_ENABLED) throw e;
-      const u = fallbackUsers.find((x) => x.email === email.toLowerCase() && x.isActive);
+      const u = fallbackUsers.find(
+        (x) => x.email === email.toLowerCase() && x.isActive,
+      );
       if (!u) return null;
       const crypto = require("crypto");
       const token = crypto.randomBytes(32).toString("hex");
@@ -874,7 +921,9 @@ export class AuthService {
       return true;
     } catch (e) {
       if (!DEV_FALLBACK_ENABLED) throw e;
-      const u = fallbackUsers.find((x) => x.email === email.toLowerCase() && x.isActive);
+      const u = fallbackUsers.find(
+        (x) => x.email === email.toLowerCase() && x.isActive,
+      );
       if (!u) return false;
       u.passwordHash = await bcrypt.hash(newPassword, 12);
       delete resetTokens[token];
