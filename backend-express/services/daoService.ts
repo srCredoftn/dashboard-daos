@@ -4,8 +4,6 @@ import { MemoryDaoRepository } from "../repositories/memoryDaoRepository";
 import { MongoDaoRepository } from "../repositories/mongoDaoRepository";
 import type { DaoRepository } from "../repositories/daoRepository";
 
-const WANT_MONGO = (process.env.USE_MONGO || "").toLowerCase() === "true";
-
 // Monotonic per-year sequence tracker to avoid reusing numbers after deletions
 const lastIssuedSeqByYear: Record<string, number> = {};
 
@@ -17,6 +15,7 @@ async function getRepo(): Promise<DaoRepository> {
   if (attempted) return repo || new MemoryDaoRepository();
   attempted = true;
 
+  const WANT_MONGO = (process.env.USE_MONGO || "").toLowerCase() === "true";
   if (!WANT_MONGO) {
     repo = new MemoryDaoRepository();
     return repo;
