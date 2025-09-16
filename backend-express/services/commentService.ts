@@ -1,6 +1,7 @@
 import type { TaskComment } from "@shared/dao";
 import { getStorageConfig } from "../config/runtime";
 import { connectToDatabase } from "../config/database";
+import type { TaskComment } from "@shared/dao";
 import type { CommentRepository } from "../repositories/commentRepository";
 import { MemoryCommentRepository } from "../repositories/memoryCommentRepository";
 import { MongoCommentRepository } from "../repositories/mongoCommentRepository";
