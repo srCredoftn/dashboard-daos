@@ -9,14 +9,12 @@ import type {
   UserRole,
 } from "@shared/dao";
 import mongoose from "mongoose";
-import { connectToDatabase } from "../config/database";
 import { getStorageConfig } from "../config/runtime";
 import type {
   UserRepository,
   PersistedUser,
 } from "../repositories/userRepository";
-import { MemoryUserRepository } from "../repositories/memoryUserRepository";
-import { MongoUserRepository } from "../repositories/mongoUserRepository";
+import { RepositoryFactory } from "../../backend/RepositoryFactory";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "24h";
