@@ -8,94 +8,17 @@ import type {
   AuthResponse,
   UserRole,
 } from "@shared/dao";
-import { connectToDatabase } from "../config/database";
 import mongoose from "mongoose";
-import UserModel, { type UserDocument } from "../models/User";
+import { connectToDatabase } from "../config/database";
+import { getStorageConfig } from "../config/runtime";
+import type {
+  UserRepository,
+  PersistedUser,
+} from "../repositories/userRepository";
+import { MemoryUserRepository } from "../repositories/memoryUserRepository";
+import { MongoUserRepository } from "../repositories/mongoUserRepository";
 
 const JWT_SECRET = process.env.JWT_SECRET;
-const DEV_FALLBACK_ENABLED =
-  (process.env.ALLOW_DEV_AUTH_FALLBACK || "true").toLowerCase() === "true" &&
-  process.env.NODE_ENV !== "production";
-
-// In-memory fallback users for development when MongoDB is unavailable
-const fallbackUsers: Array<{
-  id: string;
-  name: string;
-  email: string;
-  role: UserRole;
-  passwordHash: string;
-  createdAt: string;
-  lastLogin?: string;
-  isActive: boolean;
-  isSuperAdmin?: boolean;
-}> = [];
-
-function seedFallbackUsers() {
-  if (!DEV_FALLBACK_ENABLED) return;
-  if (fallbackUsers.length > 0) return;
-  const now = new Date().toISOString();
-  const demo = [
-    {
-      name: "Admin User",
-      email: "admin@2snd.fr",
-      role: "admin" as UserRole,
-      password: "admin123",
-    },
-    {
-      name: "Marie Dubois",
-      email: "marie.dubois@2snd.fr",
-      role: "user" as UserRole,
-      password: "marie123",
-    },
-    {
-      name: "Pierre Martin",
-      email: "pierre.martin@2snd.fr",
-      role: "user" as UserRole,
-      password: "pierre123",
-    },
-  ];
-  for (const u of demo) {
-    const id = new mongoose.Types.ObjectId().toHexString();
-    const passwordHash = bcrypt.hashSync(u.password, 10);
-    fallbackUsers.push({
-      id,
-      name: u.name,
-      email: u.email.toLowerCase(),
-      role: u.role,
-      passwordHash,
-      createdAt: now,
-      isActive: true,
-      isSuperAdmin: u.role === "admin",
-    });
-  }
-}
-seedFallbackUsers();
-
-let superAdminIdCache: string | null = null;
-async function refreshSuperAdminCache() {
-  try {
-    await connectToDatabase();
-    const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase();
-    if (adminEmail) {
-      const envAdmin = await UserModel.findOne({
-        email: adminEmail,
-        isActive: true,
-        role: "admin",
-      }).exec();
-      if (envAdmin) {
-        superAdminIdCache = envAdmin.id;
-        return;
-      }
-    }
-    const firstAdmin = await UserModel.find({ isActive: true, role: "admin" })
-      .sort({ createdAt: 1 })
-      .limit(1)
-      .exec();
-    superAdminIdCache = firstAdmin[0]?.id || null;
-  } catch (_) {
-    superAdminIdCache = null;
-  }
-}
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "24h";
 
 if (!JWT_SECRET || JWT_SECRET.length < 32) {
@@ -112,6 +35,55 @@ const resetTokens: Record<string, { email: string; expires: Date }> = {};
 // Session tracking (ephemeral)
 const activeSessions: Set<string> = new Set();
 
+let userRepo: UserRepository | null = null;
+let attempted = false;
+
+async function getUserRepo(): Promise<UserRepository> {
+  if (userRepo) return userRepo;
+  if (attempted) return userRepo || new MemoryUserRepository();
+  attempted = true;
+
+  const cfg = getStorageConfig();
+  if (!cfg.useMongo) {
+    userRepo = new MemoryUserRepository();
+    return userRepo;
+  }
+  try {
+    await connectToDatabase();
+    userRepo = new MongoUserRepository();
+    return userRepo;
+  } catch (e) {
+    if (cfg.strictDbMode && !cfg.fallbackOnDbError) throw e;
+    devLog.warn(
+      "USE_MONGO=true but DB unreachable, using in-memory users repository",
+    );
+    userRepo = new MemoryUserRepository();
+    return userRepo;
+  }
+}
+
+let superAdminIdCache: string | null = null;
+async function refreshSuperAdminCache() {
+  try {
+    const repo = await getUserRepo();
+    const list = await repo.listActive();
+    const envAdmin = process.env.ADMIN_EMAIL?.toLowerCase();
+    if (envAdmin) {
+      const match = list.find(
+        (u) => u.email.toLowerCase() === envAdmin && u.role === "admin",
+      );
+      if (match) {
+        superAdminIdCache = match.id;
+        return;
+      }
+    }
+    const firstAdmin = list.find((u) => u.role === "admin");
+    superAdminIdCache = firstAdmin?.id || null;
+  } catch {
+    superAdminIdCache = null;
+  }
+}
+
 function normalizeName(name: string): string {
   return (name || "")
     .trim()
@@ -121,24 +93,10 @@ function normalizeName(name: string): string {
 }
 
 async function ensureInitialUsers() {
-  try {
-    await connectToDatabase();
-  } catch (e) {
-    devLog.error("MongoDB indisponible pour l'authentification", e);
-    if (DEV_FALLBACK_ENABLED) {
-      const admin = fallbackUsers.find((u) => u.isSuperAdmin);
-      if (admin) {
-        superAdminIdCache = admin.id;
-        devLog.info("🔐 Dev auth fallback active with in-memory admin user");
-        return;
-      }
-    }
-    throw e;
-  }
+  const repo = await getUserRepo();
 
   const shouldSeed =
     process.env.SEED_USERS === "1" || process.env.SEED_USERS === "true";
-
   if (shouldSeed) {
     if (process.env.NODE_ENV === "production") {
       throw new Error("SEED_USERS ne peut pas être activé en production");
@@ -163,70 +121,53 @@ async function ensureInitialUsers() {
         password: "pierre123",
       },
     ];
-    await UserModel.deleteMany({}).exec();
+    await repo.deleteAll();
     for (const u of defaults) {
       const passwordHash = await bcrypt.hash(u.password, 12);
-      const doc: Partial<UserDocument> = {
-        id: new mongoose.Types.ObjectId().toHexString(),
+      await repo.create({
         name: normalizeName(u.name),
         email: u.email.toLowerCase(),
         role: u.role,
-        createdAt: new Date().toISOString(),
         isActive: true,
-        passwordHash,
         isSuperAdmin: u.role === "admin",
-      } as any;
-      await UserModel.create(doc);
+        lastLogin: undefined,
+        passwordHash,
+      } as any);
     }
-    devLog.info("🔐 AuthService initialized with seeded demo users (MongoDB)");
     await refreshSuperAdminCache();
+    devLog.info("🔐 Users initialized with demo users");
     return;
   }
 
   const adminEmail = process.env.ADMIN_EMAIL;
   const adminPassword = process.env.ADMIN_PASSWORD;
   if (adminEmail && adminPassword) {
-    const existing = await UserModel.findOne({
-      email: adminEmail.toLowerCase(),
-    }).exec();
+    const existing = await repo.findByEmail(adminEmail.toLowerCase());
     const passwordHash = await bcrypt.hash(adminPassword, 12);
-
     if (!existing) {
-      await UserModel.create({
-        id: new mongoose.Types.ObjectId().toHexString(),
+      await repo.create({
         name: "Administrator",
         email: adminEmail.toLowerCase(),
         role: "admin",
-        createdAt: new Date().toISOString(),
         isActive: true,
         isSuperAdmin: true,
         passwordHash,
-      });
+      } as any);
       devLog.info(`🔐 Admin user created from environment: ${adminEmail}`);
-    } else if (!existing.isSuperAdmin) {
-      existing.isSuperAdmin = true;
-      if (!(await bcrypt.compare(adminPassword, existing.passwordHash))) {
-        existing.passwordHash = passwordHash;
-      }
-      await existing.save();
+    } else if (!existing.isSuperAdmin || existing.role !== "admin") {
+      await repo.updateById(existing.id, {
+        isSuperAdmin: true,
+        role: "admin",
+        passwordHash,
+      });
       devLog.info(`🔐 Admin user ensured from environment: ${adminEmail}`);
     }
     await refreshSuperAdminCache();
     return;
   }
 
-  if (DEV_FALLBACK_ENABLED) {
-    const admin = fallbackUsers.find((u) => u.isSuperAdmin);
-    if (admin) {
-      superAdminIdCache = admin.id;
-      devLog.info("🔐 Dev auth fallback active with in-memory admin user");
-      return;
-    }
-  }
-
-  devLog.warn(
-    "⚠️ No initial users created. Set ADMIN_EMAIL + ADMIN_PASSWORD to create an admin on startup or run with SEED_USERS=true for development.",
-  );
+  // No seed, no env-admin -> nothing to do, but set cache if possible
+  await refreshSuperAdminCache();
 }
 
 export class AuthService {
@@ -246,9 +187,9 @@ export class AuthService {
   ): Promise<AuthResponse | null> {
     const email = credentials.email.toLowerCase();
     try {
-      await connectToDatabase();
-      const user = await UserModel.findOne({ email, isActive: true }).exec();
-      if (!user) {
+      const repo = await getUserRepo();
+      const user = await repo.findByEmail(email);
+      if (!user || !user.isActive) {
         authLog.login(credentials.email, false);
         return null;
       }
@@ -264,7 +205,6 @@ export class AuthService {
         email: user.email,
         role: user.role,
       };
-
       const token = jwt.sign(
         authUser,
         JWT_SECRET as jwt.Secret,
@@ -274,46 +214,15 @@ export class AuthService {
           audience: "dao-app",
         } as any,
       );
-
       activeSessions.add(token);
 
-      user.lastLogin = new Date().toISOString();
-      await user.save();
+      await (
+        await getUserRepo()
+      ).updateById(user.id, { lastLogin: new Date().toISOString() });
 
       authLog.login(user.email, true);
       return { user: authUser, token };
     } catch (error) {
-      if (DEV_FALLBACK_ENABLED) {
-        const u = fallbackUsers.find((x) => x.email === email && x.isActive);
-        if (!u) {
-          authLog.login(credentials.email, false);
-          return null;
-        }
-        const ok = await bcrypt.compare(credentials.password, u.passwordHash);
-        if (!ok) {
-          authLog.login(credentials.email, false);
-          return null;
-        }
-        const authUser: AuthUser = {
-          id: u.id,
-          name: u.name,
-          email: u.email,
-          role: u.role,
-        };
-        const token = jwt.sign(
-          authUser,
-          JWT_SECRET as jwt.Secret,
-          {
-            expiresIn: JWT_EXPIRES_IN as any,
-            issuer: "dao-management",
-            audience: "dao-app",
-          } as any,
-        );
-        activeSessions.add(token);
-        u.lastLogin = new Date().toISOString();
-        authLog.login(u.email, true);
-        return { user: authUser, token };
-      }
       devLog.error("Login error:", error);
       return null;
     }
@@ -325,39 +234,21 @@ export class AuthService {
         issuer: "dao-management",
         audience: "dao-app",
       }) as AuthUser;
-
       try {
-        await connectToDatabase();
-        const user = await UserModel.findOne({
-          id: decoded.id,
-          isActive: true,
-        }).exec();
-        if (!user) {
+        const repo = await getUserRepo();
+        const user = await repo.findById(decoded.id);
+        if (!user || !user.isActive) {
           activeSessions.delete(token);
           return null;
         }
         if (!activeSessions.has(token)) activeSessions.add(token);
         authLog.tokenVerification(user.email, true);
         return decoded;
-      } catch (dbErr) {
-        if (DEV_FALLBACK_ENABLED) {
-          const u = fallbackUsers.find(
-            (x) => x.id === decoded.id && x.isActive,
-          );
-          if (u) {
-            if (!activeSessions.has(token)) activeSessions.add(token);
-            authLog.tokenVerification(u.email, true);
-            return decoded;
-          }
-          // Accept decoded token in dev when DB is unavailable (graceful mode)
-          if (!activeSessions.has(token)) activeSessions.add(token);
-          authLog.tokenVerification(decoded.email || decoded.id, true);
-          return decoded;
-        }
+      } catch {
         activeSessions.delete(token);
         return null;
       }
-    } catch (_) {
+    } catch {
       activeSessions.delete(token);
       return null;
     }
@@ -400,7 +291,7 @@ export class AuthService {
           issuedAt: decoded.iat ? decoded.iat * 1000 : undefined,
           expiresAt: decoded.exp ? decoded.exp * 1000 : undefined,
         });
-      } catch (_) {
+      } catch {
         const sessionId = require("crypto")
           .createHash("sha256")
           .update(token)
@@ -421,82 +312,37 @@ export class AuthService {
   }
 
   static async getAllUsers(): Promise<User[]> {
-    try {
-      await connectToDatabase();
-      const docs = await UserModel.find({ isActive: true }).exec();
-      return docs.map((u) => ({
-        id: u.id,
-        name: u.name,
-        email: u.email,
-        role: u.role,
-        createdAt: u.createdAt,
-        lastLogin: u.lastLogin,
-        isActive: u.isActive,
-        isSuperAdmin: u.isSuperAdmin,
-      }));
-    } catch (_) {
-      if (DEV_FALLBACK_ENABLED) {
-        return fallbackUsers
-          .filter((u) => u.isActive)
-          .map(
-            (u) =>
-              ({
-                id: u.id,
-                name: u.name,
-                email: u.email,
-                role: u.role,
-                createdAt: u.createdAt,
-                lastLogin: u.lastLogin,
-                isActive: u.isActive,
-                isSuperAdmin: Boolean(u.isSuperAdmin),
-              }) as User,
-          );
-      }
-      throw _;
-    }
+    const repo = await getUserRepo();
+    const docs = await repo.listActive();
+    return docs.map((u) => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      role: u.role,
+      createdAt: u.createdAt,
+      lastLogin: u.lastLogin,
+      isActive: u.isActive,
+      isSuperAdmin: u.isSuperAdmin,
+    }));
   }
 
   static async getUserByEmail(email: string): Promise<User | null> {
-    try {
-      await connectToDatabase();
-      const u = await UserModel.findOne({
-        email: email.toLowerCase(),
-        isActive: true,
-      }).exec();
-      if (!u) return null;
-      return {
-        id: u.id,
-        name: u.name,
-        email: u.email,
-        role: u.role,
-        createdAt: u.createdAt,
-        lastLogin: u.lastLogin,
-        isActive: u.isActive,
-        isSuperAdmin: u.isSuperAdmin,
-      };
-    } catch (_) {
-      if (DEV_FALLBACK_ENABLED) {
-        const u = fallbackUsers.find(
-          (x) => x.email === email.toLowerCase() && x.isActive,
-        );
-        if (!u) return null;
-        return {
-          id: u.id,
-          name: u.name,
-          email: u.email,
-          role: u.role,
-          createdAt: u.createdAt,
-          lastLogin: u.lastLogin,
-          isActive: u.isActive,
-          isSuperAdmin: Boolean(u.isSuperAdmin),
-        } as User;
-      }
-      throw _;
-    }
+    const repo = await getUserRepo();
+    const u = await repo.findByEmail(email.toLowerCase());
+    if (!u) return null;
+    return {
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      role: u.role,
+      createdAt: u.createdAt,
+      lastLogin: u.lastLogin,
+      isActive: u.isActive,
+      isSuperAdmin: u.isSuperAdmin,
+    };
   }
 
   static getSuperAdmin(): User | null {
-    // Synchronous snapshot using cache; only id is reliable here
     if (superAdminIdCache) {
       return {
         id: superAdminIdCache,
@@ -508,56 +354,23 @@ export class AuthService {
         isSuperAdmin: true,
       } as User;
     }
-    if (DEV_FALLBACK_ENABLED) {
-      const admin = fallbackUsers.find((u) => u.isSuperAdmin);
-      if (admin) {
-        return {
-          id: admin.id,
-          name: admin.name,
-          email: admin.email,
-          role: admin.role,
-          createdAt: admin.createdAt,
-          isActive: true,
-          isSuperAdmin: true,
-        } as User;
-      }
-    }
     return null;
   }
 
   static isSuperAdmin(userId: string): boolean {
-    if (superAdminIdCache && superAdminIdCache === userId) return true;
-    if (DEV_FALLBACK_ENABLED) {
-      const u = fallbackUsers.find((x) => x.id === userId && x.isActive);
-      return Boolean(u?.isSuperAdmin);
-    }
-    return false;
+    return superAdminIdCache === userId;
   }
 
   static async verifyPasswordByEmail(
     email: string,
     password: string,
   ): Promise<boolean> {
+    const repo = await getUserRepo();
+    const u = await repo.findByEmail(email.toLowerCase());
+    if (!u) return false;
     try {
-      await connectToDatabase();
-      const user = await UserModel.findOne({
-        email: email.toLowerCase(),
-        isActive: true,
-      }).exec();
-      if (!user) return false;
-      return await bcrypt.compare(password, user.passwordHash);
-    } catch (_) {
-      if (DEV_FALLBACK_ENABLED) {
-        const u = fallbackUsers.find(
-          (x) => x.email === email.toLowerCase() && x.isActive,
-        );
-        if (!u) return false;
-        try {
-          return await bcrypt.compare(password, u.passwordHash);
-        } catch {
-          return false;
-        }
-      }
+      return await bcrypt.compare(password, u.passwordHash);
+    } catch {
       return false;
     }
   }
@@ -566,21 +379,12 @@ export class AuthService {
     id: string,
     password: string,
   ): Promise<boolean> {
+    const repo = await getUserRepo();
+    const u = await repo.findById(id);
+    if (!u) return false;
     try {
-      await connectToDatabase();
-      const user = await UserModel.findOne({ id, isActive: true }).exec();
-      if (!user) return false;
-      return await bcrypt.compare(password, user.passwordHash);
-    } catch (_) {
-      if (DEV_FALLBACK_ENABLED) {
-        const u = fallbackUsers.find((x) => x.id === id && x.isActive);
-        if (!u) return false;
-        try {
-          return await bcrypt.compare(password, u.passwordHash);
-        } catch {
-          return false;
-        }
-      }
+      return await bcrypt.compare(password, u.passwordHash);
+    } catch {
       return false;
     }
   }
@@ -591,296 +395,141 @@ export class AuthService {
     role: UserRole;
     password?: string;
   }): Promise<User> {
-    try {
-      await connectToDatabase();
+    const repo = await getUserRepo();
+    const normalizedName = normalizeName(userData.name);
 
-      const normalizedName = normalizeName(userData.name);
+    const all = await repo.listActive();
+    if (all.some((x) => x.email.toLowerCase() === userData.email.toLowerCase()))
+      throw new Error("User already exists");
+    if (all.some((x) => x.name.toLowerCase() === normalizedName.toLowerCase()))
+      throw new Error("User name already taken");
 
-      const sameName = await UserModel.findOne({
-        isActive: true,
-        name: new RegExp(`^${normalizedName}$`, "i"),
-      }).exec();
-      if (sameName) {
-        throw new Error("User name already taken");
-      }
+    const defaultPassword = userData.password || "changeme123";
+    const passwordHash = await bcrypt.hash(defaultPassword, 12);
+    const created = await repo.create({
+      name: normalizedName,
+      email: userData.email.toLowerCase(),
+      role: userData.role,
+      isActive: true,
+      isSuperAdmin: userData.role === "admin",
+      passwordHash,
+    } as any);
 
-      const existingUser = await UserModel.findOne({
-        email: userData.email.toLowerCase(),
-      }).exec();
-      if (existingUser) {
-        throw new Error("User already exists");
-      }
+    if (created.role === "admin") await refreshSuperAdminCache();
 
-      const defaultPassword = userData.password || "changeme123";
-      const passwordHash = await bcrypt.hash(defaultPassword, 12);
-
-      const doc = await UserModel.create({
-        id: new mongoose.Types.ObjectId().toHexString(),
-        name: normalizedName,
-        email: userData.email.toLowerCase(),
-        role: userData.role,
-        createdAt: new Date().toISOString(),
-        isActive: true,
-        passwordHash,
-        isSuperAdmin: userData.role === "admin",
-      });
-
-      devLog.info(`👤 New user created: ${doc.email} Role: ${doc.role}`);
-      if (doc.role === "admin") await refreshSuperAdminCache();
-      return {
-        id: doc.id,
-        name: doc.name,
-        email: doc.email,
-        role: doc.role,
-        createdAt: doc.createdAt,
-        isActive: doc.isActive,
-        lastLogin: doc.lastLogin,
-        isSuperAdmin: doc.isSuperAdmin,
-      };
-    } catch (e) {
-      if (!DEV_FALLBACK_ENABLED) throw e;
-      const normalizedName = normalizeName(userData.name);
-      if (fallbackUsers.some((u) => u.email === userData.email.toLowerCase())) {
-        throw new Error("User already exists");
-      }
-      if (
-        fallbackUsers.some(
-          (u) =>
-            u.name.toLowerCase() === normalizedName.toLowerCase() && u.isActive,
-        )
-      ) {
-        throw new Error("User name already taken");
-      }
-      const defaultPassword = userData.password || "changeme123";
-      const passwordHash = await bcrypt.hash(defaultPassword, 12);
-      const id = new mongoose.Types.ObjectId().toHexString();
-      const now = new Date().toISOString();
-      fallbackUsers.push({
-        id,
-        name: normalizedName,
-        email: userData.email.toLowerCase(),
-        role: userData.role,
-        passwordHash,
-        createdAt: now,
-        isActive: true,
-        isSuperAdmin: userData.role === "admin",
-      });
-      devLog.info(`👤 [DEV] New in-memory user created: ${userData.email}`);
-      if (userData.role === "admin") superAdminIdCache = id;
-      return {
-        id,
-        name: normalizedName,
-        email: userData.email.toLowerCase(),
-        role: userData.role,
-        createdAt: now,
-        isActive: true,
-        isSuperAdmin: userData.role === "admin",
-      } as User;
-    }
+    devLog.info(`👤 New user created: ${created.email} Role: ${created.role}`);
+    return {
+      id: created.id,
+      name: created.name,
+      email: created.email,
+      role: created.role,
+      createdAt: created.createdAt,
+      isActive: created.isActive,
+      lastLogin: created.lastLogin,
+      isSuperAdmin: created.isSuperAdmin,
+    };
   }
 
   static async updateUserRole(
     id: string,
     role: UserRole,
   ): Promise<User | null> {
-    try {
-      await connectToDatabase();
-      const doc = await UserModel.findOneAndUpdate(
-        { id },
-        { $set: { role } },
-        { new: true },
-      ).exec();
-      if (!doc) return null;
-      devLog.info(`🔄 User role updated: ${doc.email} → ${role}`);
-      return {
-        id: doc.id,
-        name: doc.name,
-        email: doc.email,
-        role: doc.role,
-        createdAt: doc.createdAt,
-        lastLogin: doc.lastLogin,
-        isActive: doc.isActive,
-        isSuperAdmin: doc.isSuperAdmin,
-      };
-    } catch (e) {
-      if (!DEV_FALLBACK_ENABLED) throw e;
-      const u = fallbackUsers.find((x) => x.id === id && x.isActive);
-      if (!u) return null;
-      u.role = role;
-      if (role === "admin") u.isSuperAdmin = true;
-      devLog.info(`🔄 [DEV] In-memory user role updated: ${u.email} → ${role}`);
-      return {
-        id: u.id,
-        name: u.name,
-        email: u.email,
-        role: u.role,
-        createdAt: u.createdAt,
-        lastLogin: u.lastLogin,
-        isActive: u.isActive,
-        isSuperAdmin: Boolean(u.isSuperAdmin),
-      } as User;
-    }
+    const repo = await getUserRepo();
+    const updated = await repo.updateById(id, {
+      role,
+      isSuperAdmin: role === "admin",
+    });
+    if (!updated) return null;
+    if (role === "admin") await refreshSuperAdminCache();
+    devLog.info(`🔄 User role updated: ${updated.email} → ${role}`);
+    return {
+      id: updated.id,
+      name: updated.name,
+      email: updated.email,
+      role: updated.role,
+      createdAt: updated.createdAt,
+      lastLogin: updated.lastLogin,
+      isActive: updated.isActive,
+      isSuperAdmin: updated.isSuperAdmin,
+    };
   }
 
   static async deactivateUser(id: string): Promise<boolean> {
-    try {
-      await connectToDatabase();
-      const doc = await UserModel.findOneAndUpdate(
-        { id },
-        { $set: { isActive: false } },
-        { new: true },
-      ).exec();
-      if (!doc) return false;
-
-      for (const token of Array.from(activeSessions)) {
-        try {
-          const decoded = jwt.verify(token, JWT_SECRET as string) as AuthUser;
-          if (decoded.id === id) activeSessions.delete(token);
-        } catch {}
-      }
-
-      devLog.info(`🚫 User deactivated: ${doc.email}`);
-      return true;
-    } catch (e) {
-      if (!DEV_FALLBACK_ENABLED) throw e;
-      const u = fallbackUsers.find((x) => x.id === id && x.isActive);
-      if (!u) return false;
-      u.isActive = false;
-      for (const token of Array.from(activeSessions)) {
-        try {
-          const decoded = jwt.verify(token, JWT_SECRET as string) as AuthUser;
-          if (decoded.id === id) activeSessions.delete(token);
-        } catch {}
-      }
-      devLog.info(`🚫 [DEV] In-memory user deactivated: ${u.email}`);
-      return true;
+    const repo = await getUserRepo();
+    const ok = await repo.deactivateById(id);
+    if (!ok) return false;
+    for (const token of Array.from(activeSessions)) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET as string) as AuthUser;
+        if (decoded.id === id) activeSessions.delete(token);
+      } catch {}
     }
+    devLog.info(`🚫 User deactivated: ${id}`);
+    return true;
   }
 
   static async changePassword(
     id: string,
     newPassword: string,
   ): Promise<boolean> {
-    try {
-      await connectToDatabase();
-      const doc = await UserModel.findOne({ id, isActive: true }).exec();
-      if (!doc) return false;
-      doc.passwordHash = await bcrypt.hash(newPassword, 12);
-      await doc.save();
-      devLog.info(`🔑 Password changed for: ${doc.email}`);
-      return true;
-    } catch (e) {
-      if (!DEV_FALLBACK_ENABLED) throw e;
-      const u = fallbackUsers.find((x) => x.id === id && x.isActive);
-      if (!u) return false;
-      u.passwordHash = await bcrypt.hash(newPassword, 12);
-      devLog.info(`🔑 [DEV] Password changed for: ${u.email}`);
-      return true;
-    }
+    const repo = await getUserRepo();
+    const u = await repo.findById(id);
+    if (!u || !u.isActive) return false;
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await repo.updateById(id, { passwordHash });
+    devLog.info(`🔑 Password changed for: ${u.email}`);
+    return true;
   }
 
   static async updateProfile(
     id: string,
     updates: { name: string; email?: string },
   ): Promise<User | null> {
-    try {
-      await connectToDatabase();
-      const doc = await UserModel.findOne({ id, isActive: true }).exec();
-      if (!doc) return null;
+    const repo = await getUserRepo();
+    const u = await repo.findById(id);
+    if (!u || !u.isActive) return null;
 
-      if (
-        updates.email &&
-        updates.email.toLowerCase() !== doc.email.toLowerCase()
-      ) {
-        throw new Error("Email change not allowed");
-      }
-
-      const normalizedName = normalizeName(updates.name);
-      const conflict = await UserModel.findOne({
-        isActive: true,
-        id: { $ne: id },
-        name: new RegExp(`^${normalizedName}$`, "i"),
-      }).exec();
-      if (conflict) throw new Error("User name already taken");
-
-      doc.name = normalizedName;
-      await doc.save();
-
-      devLog.info(`📝 Profile updated for: ${doc.email}`);
-      return {
-        id: doc.id,
-        name: doc.name,
-        email: doc.email,
-        role: doc.role,
-        createdAt: doc.createdAt,
-        lastLogin: doc.lastLogin,
-        isActive: doc.isActive,
-        isSuperAdmin: doc.isSuperAdmin,
-      };
-    } catch (e) {
-      if (!DEV_FALLBACK_ENABLED) throw e;
-      const u = fallbackUsers.find((x) => x.id === id && x.isActive);
-      if (!u) return null;
-      const normalizedName = normalizeName(updates.name);
-      if (
-        fallbackUsers.some(
-          (x) =>
-            x.isActive &&
-            x.id !== id &&
-            x.name.toLowerCase() === normalizedName.toLowerCase(),
-        )
-      ) {
-        throw new Error("User name already taken");
-      }
-      if (
-        updates.email &&
-        updates.email.toLowerCase() !== u.email.toLowerCase()
-      ) {
-        throw new Error("Email change not allowed");
-      }
-      u.name = normalizedName;
-      devLog.info(`📝 [DEV] Profile updated for: ${u.email}`);
-      return {
-        id: u.id,
-        name: u.name,
-        email: u.email,
-        role: u.role,
-        createdAt: u.createdAt,
-        lastLogin: u.lastLogin,
-        isActive: u.isActive,
-        isSuperAdmin: Boolean(u.isSuperAdmin),
-      } as User;
+    if (
+      updates.email &&
+      updates.email.toLowerCase() !== u.email.toLowerCase()
+    ) {
+      throw new Error("Email change not allowed");
     }
+
+    const normalizedName = normalizeName(updates.name);
+    const all = await repo.listActive();
+    const conflict = all.find(
+      (x) =>
+        x.id !== id && x.name.toLowerCase() === normalizedName.toLowerCase(),
+    );
+    if (conflict) throw new Error("User name already taken");
+
+    const updated = await repo.updateById(id, { name: normalizedName });
+    if (!updated) return null;
+
+    devLog.info(`📝 Profile updated for: ${updated.email}`);
+    return {
+      id: updated.id,
+      name: updated.name,
+      email: updated.email,
+      role: updated.role,
+      createdAt: updated.createdAt,
+      lastLogin: updated.lastLogin,
+      isActive: updated.isActive,
+      isSuperAdmin: updated.isSuperAdmin,
+    };
   }
 
   static async generateResetToken(email: string): Promise<string | null> {
-    try {
-      await connectToDatabase();
-      const user = await UserModel.findOne({
-        email: email.toLowerCase(),
-        isActive: true,
-      }).exec();
-      if (!user) return null;
-
-      const crypto = require("crypto");
-      const token = crypto.randomBytes(32).toString("hex");
-      const expires = new Date(Date.now() + 15 * 60 * 1000);
-      resetTokens[token] = { email: user.email, expires };
-      devLog.info(`🔒 Password reset token generated for: ${user.email}`);
-      return token;
-    } catch (e) {
-      if (!DEV_FALLBACK_ENABLED) throw e;
-      const u = fallbackUsers.find(
-        (x) => x.email === email.toLowerCase() && x.isActive,
-      );
-      if (!u) return null;
-      const crypto = require("crypto");
-      const token = crypto.randomBytes(32).toString("hex");
-      const expires = new Date(Date.now() + 15 * 60 * 1000);
-      resetTokens[token] = { email: u.email, expires };
-      devLog.info(`🔒 [DEV] Password reset token generated for: ${u.email}`);
-      return token;
-    }
+    const repo = await getUserRepo();
+    const user = await repo.findByEmail(email.toLowerCase());
+    if (!user) return null;
+    const crypto = require("crypto");
+    const token = crypto.randomBytes(32).toString("hex");
+    const expires = new Date(Date.now() + 15 * 60 * 1000);
+    resetTokens[token] = { email: user.email, expires };
+    devLog.info(`🔒 Password reset token generated for: ${user.email}`);
+    return token;
   }
 
   static async verifyResetToken(
@@ -904,32 +553,14 @@ export class AuthService {
   ): Promise<boolean> {
     const isValid = await this.verifyResetToken(token, email);
     if (!isValid) return false;
-
-    try {
-      await connectToDatabase();
-      const user = await UserModel.findOne({
-        email: email.toLowerCase(),
-        isActive: true,
-      }).exec();
-      if (!user) return false;
-
-      user.passwordHash = await bcrypt.hash(newPassword, 12);
-      await user.save();
-
-      delete resetTokens[token];
-      devLog.info(`🔑 Password reset successful for: ${user.email}`);
-      return true;
-    } catch (e) {
-      if (!DEV_FALLBACK_ENABLED) throw e;
-      const u = fallbackUsers.find(
-        (x) => x.email === email.toLowerCase() && x.isActive,
-      );
-      if (!u) return false;
-      u.passwordHash = await bcrypt.hash(newPassword, 12);
-      delete resetTokens[token];
-      devLog.info(`🔑 [DEV] Password reset successful for: ${u.email}`);
-      return true;
-    }
+    const repo = await getUserRepo();
+    const user = await repo.findByEmail(email.toLowerCase());
+    if (!user || !user.isActive) return false;
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await repo.updateById(user.id, { passwordHash });
+    delete resetTokens[token];
+    devLog.info(`🔑 Password reset successful for: ${user.email}`);
+    return true;
   }
 
   static getActiveSessionCount(): number {
@@ -955,28 +586,25 @@ export class AuthService {
   }
 
   static async reinitializeUsers(): Promise<void> {
-    await connectToDatabase();
-
+    const repo = await getUserRepo();
     const shouldSeed =
       process.env.SEED_USERS === "1" || process.env.SEED_USERS === "true";
     if (shouldSeed) {
-      await UserModel.deleteMany({}).exec();
+      await repo.deleteAll();
       await ensureInitialUsers();
       await refreshSuperAdminCache();
       devLog.info("🔄 Users reinitialized to defaults (seed)");
       return;
     }
-
     const adminEmail = process.env.ADMIN_EMAIL;
     const adminPassword = process.env.ADMIN_PASSWORD;
     if (adminEmail && adminPassword) {
-      await UserModel.deleteMany({}).exec();
+      await repo.deleteAll();
       await ensureInitialUsers();
       await refreshSuperAdminCache();
       devLog.info("🔄 Users reinitialized to single env admin");
       return;
     }
-
     devLog.info("ℹ️ Users reinitialize skipped (no seed/env admin specified)");
   }
 }

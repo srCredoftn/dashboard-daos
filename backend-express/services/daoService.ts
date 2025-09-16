@@ -26,6 +26,11 @@ async function getRepo(): Promise<DaoRepository> {
     repo = new MongoDaoRepository();
     return repo;
   } catch (e) {
+    const { getStorageConfig } = await import("../config/runtime");
+    const cfg = getStorageConfig();
+    if (cfg.strictDbMode && !cfg.fallbackOnDbError) {
+      throw e;
+    }
     console.warn(
       "⚠️ USE_MONGO=true but MongoDB not available, falling back to in-memory repository:",
       String(e),

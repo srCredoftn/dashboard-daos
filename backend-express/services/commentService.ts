@@ -1,121 +1,101 @@
 import type { TaskComment } from "@shared/dao";
+import { getStorageConfig } from "../config/runtime";
+import { connectToDatabase } from "../config/database";
+import type { TaskComment } from "@shared/dao";
+import type { CommentRepository } from "../repositories/commentRepository";
+import { MemoryCommentRepository } from "../repositories/memoryCommentRepository";
+import { MongoCommentRepository } from "../repositories/mongoCommentRepository";
 
-// In-memory comment storage
-let comments: TaskComment[] = [];
+let repo: CommentRepository | null = null;
+let attempted = false;
+async function getRepo(): Promise<CommentRepository> {
+  if (repo) return repo;
+  if (attempted) return repo || new MemoryCommentRepository();
+  attempted = true;
+  const cfg = getStorageConfig();
+  if (!cfg.useMongo) {
+    repo = new MemoryCommentRepository();
+    return repo;
+  }
+  try {
+    await connectToDatabase();
+    repo = new MongoCommentRepository();
+    return repo;
+  } catch (e) {
+    if (cfg.strictDbMode && !cfg.fallbackOnDbError) throw e;
+    repo = new MemoryCommentRepository();
+    return repo;
+  }
+}
 
 export class CommentService {
-  // Get all comments for a specific task
   static async getTaskComments(
     daoId: string,
     taskId: number,
   ): Promise<TaskComment[]> {
-    return comments
-      .filter((comment) => comment.daoId === daoId && comment.taskId === taskId)
-      .sort(
-        (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      );
+    const r = await getRepo();
+    return r.listByTask(daoId, taskId);
   }
 
-  // Get all comments for a DAO
   static async getDaoComments(daoId: string): Promise<TaskComment[]> {
-    return comments
-      .filter((comment) => comment.daoId === daoId)
-      .sort(
-        (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      );
+    const r = await getRepo();
+    return r.listByDao(daoId);
   }
 
-  // Add a new comment
   static async addComment(
     commentData: Omit<TaskComment, "id" | "createdAt">,
   ): Promise<TaskComment> {
+    const r = await getRepo();
     const comment: TaskComment = {
       ...commentData,
       id: `comment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       createdAt: new Date().toISOString(),
     };
-
-    comments.push(comment);
-
-    console.log("💬 New comment added:", {
-      daoId: comment.daoId,
-      taskId: comment.taskId,
-      userName: comment.userName,
-      content: comment.content.substring(0, 50) + "...",
-    });
-
-    return comment;
+    return r.add(comment);
   }
 
-  // Update a comment (only by the author)
   static async updateComment(
     commentId: string,
     userId: string,
     newContent: string,
   ): Promise<TaskComment | null> {
-    const comment = comments.find((c) => c.id === commentId);
-
-    if (!comment) {
-      return null;
-    }
-
-    // Only the author can update their comment
-    if (comment.userId !== userId) {
+    const r = await getRepo();
+    const existing = await r.getById(commentId);
+    if (!existing) return null;
+    if (existing.userId !== userId)
       throw new Error("Unauthorized: Can only update your own comments");
-    }
-
-    comment.content = newContent;
-
-    console.log("✏️ Comment updated:", commentId);
-    return comment;
+    return r.update(commentId, { content: newContent });
   }
 
-  // Delete a comment (author or admin)
   static async deleteComment(
     commentId: string,
     userId: string,
     isAdmin = false,
   ): Promise<boolean> {
-    const commentIndex = comments.findIndex((c) => c.id === commentId);
-
-    if (commentIndex === -1) {
-      return false;
-    }
-
-    const comment = comments[commentIndex];
-
-    // Allow if author or admin
-    if (!isAdmin && comment.userId !== userId) {
+    const r = await getRepo();
+    const existing = await r.getById(commentId);
+    if (!existing) return false;
+    if (!isAdmin && existing.userId !== userId)
       throw new Error("Unauthorized: Can only delete your own comments");
-    }
-
-    comments.splice(commentIndex, 1);
-
-    console.log("🗑️ Comment deleted:", commentId);
-    return true;
+    return r.delete(commentId);
   }
 
-  // Get recent comments across all DAOs (for activity feed)
   static async getRecentComments(limit: number = 10): Promise<TaskComment[]> {
-    return comments
-      .sort(
-        (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      )
-      .slice(0, limit);
+    const r = await getRepo();
+    return r.listRecent(limit);
   }
 
-  // Get comment by ID
   static async getCommentById(commentId: string): Promise<TaskComment | null> {
-    return comments.find((c) => c.id === commentId) || null;
+    const r = await getRepo();
+    return r.getById(commentId);
   }
 
-  // Initialize with some sample comments
-  static initializeSampleComments() {
-    if (comments.length === 0) {
-      const sampleComments: TaskComment[] = [
+  static async initializeSampleComments() {
+    const r = await getRepo();
+    const recent = await r.listRecent(1);
+    if (recent.length === 0) {
+      const now = Date.now();
+      const samples: TaskComment[] = [
         {
           id: "comment_1",
           taskId: 1,
@@ -124,7 +104,7 @@ export class CommentService {
           userName: "Marie Dubois",
           content:
             "Drive créé et documents de base ajoutés. Prêt pour la phase suivante.",
-          createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
+          createdAt: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
         },
         {
           id: "comment_2",
@@ -134,7 +114,7 @@ export class CommentService {
           userName: "Pierre Martin",
           content:
             "Demande de caution en cours. Attente de la réponse de la banque.",
-          createdAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(), // 1 hour ago
+          createdAt: new Date(now - 1 * 60 * 60 * 1000).toISOString(),
         },
         {
           id: "comment_3",
@@ -143,11 +123,10 @@ export class CommentService {
           userId: "2",
           userName: "Marie Dubois",
           content: "Mise à jour: La banque a confirmé. Dossier complet à 75%.",
-          createdAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(), // 30 minutes ago
+          createdAt: new Date(now - 30 * 60 * 1000).toISOString(),
         },
       ];
-
-      comments.push(...sampleComments);
+      for (const s of samples) await r.add(s);
       console.log("📝 Sample comments initialized");
     }
   }

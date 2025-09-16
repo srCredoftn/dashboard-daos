@@ -24,6 +24,7 @@
     "test": "vitest --run",
     "test:watch": "vitest",
     "test:coverage": "vitest --coverage",
+    "test:modes": "node scripts/run-tests-modes.mjs",
     "format.fix": "prettier --write .",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ext .ts,.tsx",

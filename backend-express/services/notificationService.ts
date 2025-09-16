@@ -1,3 +1,13 @@
+import { getStorageConfig } from "../config/runtime";
+import { connectToDatabase } from "../config/database";
+import { getStorageConfig } from "../config/runtime";
+import type {
+  NotificationRepository,
+  PersistedNotification,
+} from "../repositories/notificationRepository";
+import { MemoryNotificationRepository } from "../repositories/memoryNotificationRepository";
+import { MongoNotificationRepository } from "../repositories/mongoNotificationRepository";
+
 export type NotificationType =
   | "role_update"
   | "comment_added"
@@ -26,10 +36,33 @@ export interface ServerNotification {
   createdAt: string;
 }
 
-class NotificationServiceClass {
-  private notifications: ServerNotification[] = [];
+let repo: NotificationRepository | null = null;
+let attempted = false;
+async function getRepo(): Promise<NotificationRepository> {
+  if (repo) return repo;
+  if (attempted) return repo || new MemoryNotificationRepository();
+  attempted = true;
+  const cfg = getStorageConfig();
+  if (!cfg.useMongo) {
+    repo = new MemoryNotificationRepository();
+    return repo;
+  }
+  try {
+    await connectToDatabase();
+    repo = new MongoNotificationRepository();
+    return repo;
+  } catch (e) {
+    if (cfg.strictDbMode && !cfg.fallbackOnDbError) throw e;
+    repo = new MemoryNotificationRepository();
+    return repo;
+  }
+}
 
-  private buildEmailContent(n: ServerNotification): { subject: string; body: string } {
+class NotificationServiceClass {
+  private buildEmailContent(n: ServerNotification): {
+    subject: string;
+    body: string;
+  } {
     const type = n.type;
     const data = n.data || {};
     switch (type) {
@@ -71,10 +104,10 @@ class NotificationServiceClass {
     }
   }
 
-  private async resolveRecipientEmails(n: ServerNotification): Promise<string[]> {
+  private async resolveRecipientEmails(
+    n: ServerNotification,
+  ): Promise<string[]> {
     const emails: Set<string> = new Set();
-
-    // 1) Try DB users via AuthService (best effort)
     try {
       const { AuthService } = await import("./authService");
       if (n.recipients === "all") {
@@ -88,47 +121,30 @@ class NotificationServiceClass {
           if (e) emails.add(e);
         });
       }
-    } catch (_) {
-      // DB not available -> fallback paths below
-    }
-
-    // 2) Fallback: collect team member emails from in-memory DAO storage
+    } catch {}
     try {
       const { daoStorage } = await import("../data/daoStorage");
       const allDaos = daoStorage.getAll();
-      for (const dao of allDaos) {
+      for (const dao of allDaos)
         for (const m of dao.equipe) if (m.email) emails.add(m.email);
-      }
-    } catch (_) {}
-
-    // 3) Always include admin email if present
+    } catch {}
     if (process.env.ADMIN_EMAIL) emails.add(String(process.env.ADMIN_EMAIL));
-
     return Array.from(emails).filter(Boolean);
   }
 
-  listForUser(
-    userId: string,
-  ): (Omit<ServerNotification, "readBy" | "recipients"> & { read: boolean })[] {
-    return this.notifications
-      .filter(
-        (n) =>
-          n.recipients === "all" ||
-          (Array.isArray(n.recipients) && n.recipients.includes(userId)),
-      )
-      .sort(
-        (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      )
-      .map((n) => ({
+  listForUser(userId: string) {
+    return getRepo().then(async (r) => {
+      const list = await r.listForUser(userId);
+      return list.map((n) => ({
         id: n.id,
-        type: n.type,
+        type: n.type as any,
         title: n.title,
         message: n.message,
         data: n.data,
         createdAt: n.createdAt,
-        read: n.readBy.has(userId),
+        read: (n.readBy || []).includes(userId),
       }));
+    });
   }
 
   add(
@@ -140,32 +156,23 @@ class NotificationServiceClass {
       readBy: new Set(),
       createdAt: new Date().toISOString(),
     };
-    this.notifications.unshift(newNotif);
-    if (this.notifications.length > 500) this.notifications.pop();
+    Promise.resolve()
+      .then(async () => {
+        const r = await getRepo();
+        await r.add({ ...newNotif, readBy: [] });
+      })
+      .catch(() => {});
 
     // Mirror to email (best-effort, non-blocking)
     Promise.resolve()
       .then(async () => {
         try {
           const { EmailService } = await import("./emailService");
-
-          // Privacy guard: never broadcast someone else's login to others
-          if (
-            newNotif.type === "system" &&
-            /connexion/i.test(newNotif.title || "") &&
-            newNotif.recipients !== "all"
-          ) {
-            // Only send to intended recipient list
-          }
-
           const { subject, body } = this.buildEmailContent(newNotif);
           const toList = await this.resolveRecipientEmails(newNotif);
-          if (toList.length) {
+          if (toList.length)
             await EmailService.sendBulkNotification(toList, subject, body);
-          }
-        } catch (_) {
-          // swallow silently
-        }
+        } catch {}
       })
       .catch(() => {});
 
@@ -182,30 +189,32 @@ class NotificationServiceClass {
   }
 
   markRead(userId: string, notifId: string): boolean {
-    const notif = this.notifications.find((n) => n.id === notifId);
-    if (!notif) return false;
-    notif.readBy.add(userId);
+    Promise.resolve()
+      .then(async () => {
+        const r = await getRepo();
+        await r.markRead(userId, notifId);
+      })
+      .catch(() => {});
     return true;
   }
 
   markAllRead(userId: string): number {
-    let count = 0;
-    for (const n of this.notifications) {
-      if (
-        n.recipients === "all" ||
-        (Array.isArray(n.recipients) && n.recipients.includes(userId))
-      ) {
-        if (!n.readBy.has(userId)) {
-          n.readBy.add(userId);
-          count++;
-        }
-      }
-    }
-    return count;
+    Promise.resolve()
+      .then(async () => {
+        const r = await getRepo();
+        await r.markAllRead(userId);
+      })
+      .catch(() => {});
+    return 0;
   }
 
   clearAll(): void {
-    this.notifications = [];
+    Promise.resolve()
+      .then(async () => {
+        const r = await getRepo();
+        await r.clearAll();
+      })
+      .catch(() => {});
   }
 }
 
