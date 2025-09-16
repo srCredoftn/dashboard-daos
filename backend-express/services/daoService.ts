@@ -1,43 +1,12 @@
 import type { Dao } from "@shared/dao";
-import { connectToDatabase } from "../config/database";
-import { MemoryDaoRepository } from "../repositories/memoryDaoRepository";
-import { MongoDaoRepository } from "../repositories/mongoDaoRepository";
 import type { DaoRepository } from "../repositories/daoRepository";
+import { RepositoryFactory } from "../../backend/RepositoryFactory";
 
 // Monotonic per-year sequence tracker to avoid reusing numbers after deletions
 const lastIssuedSeqByYear: Record<string, number> = {};
 
-let repo: DaoRepository | null = null;
-let attempted = false;
-
 async function getRepo(): Promise<DaoRepository> {
-  if (repo) return repo;
-  if (attempted) return repo || new MemoryDaoRepository();
-  attempted = true;
-
-  const WANT_MONGO = (process.env.USE_MONGO || "").toLowerCase() === "true";
-  if (!WANT_MONGO) {
-    repo = new MemoryDaoRepository();
-    return repo;
-  }
-
-  try {
-    await connectToDatabase();
-    repo = new MongoDaoRepository();
-    return repo;
-  } catch (e) {
-    const { getStorageConfig } = await import("../config/runtime");
-    const cfg = getStorageConfig();
-    if (cfg.strictDbMode && !cfg.fallbackOnDbError) {
-      throw e;
-    }
-    console.warn(
-      "⚠️ USE_MONGO=true but MongoDB not available, falling back to in-memory repository:",
-      String(e),
-    );
-    repo = new MemoryDaoRepository();
-    return repo;
-  }
+  return RepositoryFactory.daos();
 }
 
 export class DaoService {
