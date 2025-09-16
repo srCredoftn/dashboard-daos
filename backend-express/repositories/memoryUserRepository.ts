@@ -3,6 +3,10 @@ import type { PersistedUser, UserRepository } from "./userRepository";
 
 const users: PersistedUser[] = [];
 
+function genId() {
+  return `user_${Date.now()}_${Math.random().toString(36).slice(2,9)}`;
+}
+
 export class MemoryUserRepository implements UserRepository {
   async findByEmail(email: string): Promise<PersistedUser | null> {
     return users.find((u) => u.isActive && u.email.toLowerCase() === email.toLowerCase()) || null;
@@ -15,7 +19,7 @@ export class MemoryUserRepository implements UserRepository {
   }
   async create(u: Omit<PersistedUser, "id" | "createdAt"> & { id?: string; createdAt?: string }): Promise<PersistedUser> {
     const doc: PersistedUser = {
-      id: u.id || new mongoose.Types.ObjectId().toHexString(),
+      id: u.id || genId(),
       name: u.name,
       email: u.email.toLowerCase(),
       role: u.role,
