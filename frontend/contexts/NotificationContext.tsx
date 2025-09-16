@@ -64,7 +64,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   const refresh = async () => {
     if (!user) return;
-    const serverNotifs = await notificationsApi.list();
+    const serverNotifsRaw = await notificationsApi.list();
+    const serverNotifs: ServerNotification[] = Array.isArray(serverNotifsRaw)
+      ? serverNotifsRaw
+      : (serverNotifsRaw as any)?.items && Array.isArray((serverNotifsRaw as any).items)
+        ? (serverNotifsRaw as any).items
+        : [];
+
     const local = notificationService.getUserNotifications(user.id);
     const merged: Notification[] = [
       ...serverNotifs.map<Notification>((sn: ServerNotification) => ({
