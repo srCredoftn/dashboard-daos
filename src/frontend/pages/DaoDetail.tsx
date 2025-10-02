@@ -232,23 +232,21 @@ export default function DaoDetail() {
   };
 
   const handleTaskApplicableChange = (taskId: number, applicable: boolean) => {
-    if (!dao) return;
+    if (!activeDao) return;
 
     const updates = { isApplicable: applicable } as Partial<DaoTask>;
 
-    // MAJ optimiste
-    setDao((prev) => {
+    // MAJ locale sur le brouillon
+    setDraftDao((prev) => {
       if (!prev) return prev;
       return {
         ...prev,
         tasks: prev.tasks.map((task) =>
-          task.id === taskId ? { ...task, ...updates } : task,
+          task.id === taskId ? { ...task, ...updates, lastUpdatedAt: new Date().toISOString() } : task,
         ),
-      };
+      } as Dao;
     });
-
-    // Persistance ciblée
-    handleTaskUpdate(taskId, updates);
+    setUnsavedChanges(true);
   };
 
   const handleTeamUpdate = (newTeam: TeamMember[]) => {
