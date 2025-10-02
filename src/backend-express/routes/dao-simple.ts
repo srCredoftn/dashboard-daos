@@ -961,11 +961,11 @@ router.post(
       const prevLeader = dao.equipe.find((m) => m.role === "chef_equipe");
 
       // Build new team roles: promote target, demote previous leader if different
-      const newEquipe = dao.equipe.map((m) => {
-        if (m.id === memberId) return { ...m, role: "chef_equipe" };
+      const newEquipe: TeamMember[] = dao.equipe.map((m) => {
+        if (m.id === memberId) return { ...m, role: "chef_equipe" as const } as TeamMember;
         if (prevLeader && m.id === prevLeader.id && prevLeader.id !== memberId)
-          return { ...m, role: "membre_equipe" };
-        return m;
+          return { ...m, role: "membre_equipe" as const } as TeamMember;
+        return m as TeamMember;
       });
 
       // Persist change server-side (ensure persisted before broadcasting)
