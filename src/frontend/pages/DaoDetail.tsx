@@ -95,6 +95,8 @@ export default function DaoDetail() {
         setError(null);
         const fetchedDao = await apiService.getDaoById(id);
         setDao(fetchedDao);
+        setDraftDao(JSON.parse(JSON.stringify(fetchedDao)));
+        setUnsavedChanges(false);
 
         // Déterminer s'il s'agit du dernier DAO créé (fonctionnalité admin)
         try {
@@ -680,7 +682,7 @@ export default function DaoDetail() {
                 (id) => dao?.equipe.find((m) => m.id === id)?.name || "Inconnu",
               )
               .join(", ")
-          : "Non assign��";
+          : "Non assigné";
       const row = [task.name, applicableText, progressText, assignee];
 
       const wrapped = row.map((cell, i) =>
