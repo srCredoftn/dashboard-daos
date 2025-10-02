@@ -31,6 +31,8 @@ import { assertDbConnectivityIfRequired } from "./config/runtime";
 import { AuthService } from "./services/authService";
 import { DaoService } from "./services/daoService";
 import { daoStorage } from "./data/daoStorage";
+// Start mail queue worker (side-effect)
+import "./services/mailQueue";
 
 export function createServer(): express.Application {
   const app = express();
