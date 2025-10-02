@@ -1052,7 +1052,7 @@ export default function DaoDetail() {
                     <Input
                       value={tempReference}
                       onChange={(e) => setTempReference(e.target.value)}
-                      placeholder="Saisir la r��férence..."
+                      placeholder="Saisir la référence..."
                       className="font-medium"
                     />
                     <div className="flex gap-2">
@@ -1081,7 +1081,7 @@ export default function DaoDetail() {
                   <span
                     className={cn(
                       "px-2 py-1 rounded text-sm font-medium blink-attention",
-                      getBlinkingDateClasses(progress, dao.dateDepot),
+                      getBlinkingDateClasses(progress, activeDao?.dateDepot || ""),
                     )}
                   >
                     {dateInfo.date} ({dateInfo.daysDiffAbs}j{" "}
