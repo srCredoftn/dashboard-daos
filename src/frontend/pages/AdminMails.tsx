@@ -41,7 +41,9 @@ export default function AdminMails() {
           // try to extract JSON error body, otherwise text
           if (ct.includes("application/json")) {
             const json = await res.json().catch(() => null);
-            throw new Error(json?.error || JSON.stringify(json) || `HTTP ${res.status}`);
+            throw new Error(
+              json?.error || JSON.stringify(json) || `HTTP ${res.status}`,
+            );
           }
           const txt = await res.text().catch(() => "");
           throw new Error(txt || `HTTP ${res.status}`);
@@ -81,10 +83,16 @@ export default function AdminMails() {
     if (!search) return true;
     const s = search.toLowerCase();
     return (
-      String(l.id || "").toLowerCase().includes(s) ||
-      String(l.subject || "").toLowerCase().includes(s) ||
+      String(l.id || "")
+        .toLowerCase()
+        .includes(s) ||
+      String(l.subject || "")
+        .toLowerCase()
+        .includes(s) ||
       (Array.isArray(l.to) && l.to.join(",").toLowerCase().includes(s)) ||
-      String(l.type || "").toLowerCase().includes(s)
+      String(l.type || "")
+        .toLowerCase()
+        .includes(s)
     );
   });
 
@@ -116,7 +124,9 @@ export default function AdminMails() {
         <Card>
           <div className="p-4">
             <h3 className="font-semibold">Diagnostics SMTP</h3>
-            <pre className="text-sm mt-2">{JSON.stringify(diag || {}, null, 2)}</pre>
+            <pre className="text-sm mt-2">
+              {JSON.stringify(diag || {}, null, 2)}
+            </pre>
           </div>
         </Card>
         <Card>
@@ -134,14 +144,22 @@ export default function AdminMails() {
       </div>
 
       <div className="mb-4 flex items-center gap-2">
-        <Input placeholder="Recherche id, sujet, destinataire, type..." value={search} onChange={(e:any)=>setSearch(e.target.value)} />
-        <Button onClick={() => fetchData()} disabled={loading}>Rafraîchir</Button>
+        <Input
+          placeholder="Recherche id, sujet, destinataire, type..."
+          value={search}
+          onChange={(e: any) => setSearch(e.target.value)}
+        />
+        <Button onClick={() => fetchData()} disabled={loading}>
+          Rafraîchir
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <div className="p-4">
-            <h3 className="font-semibold mb-2">File d'attente (pending/failed)</h3>
+            <h3 className="font-semibold mb-2">
+              File d'attente (pending/failed)
+            </h3>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -159,13 +177,21 @@ export default function AdminMails() {
                   {queue.map((qj) => (
                     <tr key={qj.id} className="border-t">
                       <td className="py-2 align-top">{qj.id}</td>
-                      <td className="py-2 align-top">{(qj.to || []).join(", ")}</td>
+                      <td className="py-2 align-top">
+                        {(qj.to || []).join(", ")}
+                      </td>
                       <td className="py-2 align-top">{qj.subject}</td>
                       <td className="py-2 align-top">{qj.type}</td>
                       <td className="py-2 align-top">{qj.attempts}</td>
-                      <td className="py-2 align-top">{qj.nextAttemptAt ? new Date(qj.nextAttemptAt).toLocaleString() : "-"}</td>
                       <td className="py-2 align-top">
-                        <Button onClick={() => requeue(qj.id)} size="sm">Requeue</Button>
+                        {qj.nextAttemptAt
+                          ? new Date(qj.nextAttemptAt).toLocaleString()
+                          : "-"}
+                      </td>
+                      <td className="py-2 align-top">
+                        <Button onClick={() => requeue(qj.id)} size="sm">
+                          Requeue
+                        </Button>
                       </td>
                     </tr>
                   ))}
@@ -193,14 +219,36 @@ export default function AdminMails() {
                 </thead>
                 <tbody>
                   {filteredLogs.map((l) => (
-                    <tr key={l.id + String(l.processedAt || l.createdAt)} className="border-t">
-                      <td className="py-2 align-top">{l.status || (l.failed ? 'failed' : l.processed ? 'sent' : 'unknown')}</td>
+                    <tr
+                      key={l.id + String(l.processedAt || l.createdAt)}
+                      className="border-t"
+                    >
+                      <td className="py-2 align-top">
+                        {l.status ||
+                          (l.failed
+                            ? "failed"
+                            : l.processed
+                              ? "sent"
+                              : "unknown")}
+                      </td>
                       <td className="py-2 align-top">{l.id}</td>
-                      <td className="py-2 align-top">{(l.to || []).join(", ")}</td>
+                      <td className="py-2 align-top">
+                        {(l.to || []).join(", ")}
+                      </td>
                       <td className="py-2 align-top">{l.subject || l.type}</td>
-                      <td className="py-2 align-top">{l.createdAt ? new Date(l.createdAt).toLocaleString() : '-'}</td>
-                      <td className="py-2 align-top">{l.processedAt ? new Date(l.processedAt).toLocaleString() : '-'}</td>
-                      <td className="py-2 align-top text-red-600">{l.lastError || '-'}</td>
+                      <td className="py-2 align-top">
+                        {l.createdAt
+                          ? new Date(l.createdAt).toLocaleString()
+                          : "-"}
+                      </td>
+                      <td className="py-2 align-top">
+                        {l.processedAt
+                          ? new Date(l.processedAt).toLocaleString()
+                          : "-"}
+                      </td>
+                      <td className="py-2 align-top text-red-600">
+                        {l.lastError || "-"}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

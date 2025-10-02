@@ -4,7 +4,7 @@ Domaine: Backend/Services
 Exports: NotificationType, ServerNotification, NotificationService
 Liens: appels /api, utils de fetch, types @shared/*
 */
-import { /* emailAllUsers, sendEmail removed - mail queue used instead */ } from "./txEmail";
+import {} from /* emailAllUsers, sendEmail removed - mail queue used instead */ "./txEmail";
 import { AuthService } from "./authService";
 import { logger } from "../utils/logger";
 import { MongoNotificationRepository } from "../repositories/mongoNotificationRepository";
@@ -146,35 +146,51 @@ class InMemoryNotificationService {
         // fetch all emails now and enqueue as batches
         const allEmails = await (async () => {
           try {
-            return (await AuthService.getAllUsers()).map((u) => u.email).filter(Boolean);
+            return (await AuthService.getAllUsers())
+              .map((u) => u.email)
+              .filter(Boolean);
           } catch {
             return [] as string[];
           }
         })();
         if (!allEmails || allEmails.length === 0) {
-          logger.info("Miroir email : aucun destinataire trouvé (skip)", "MAIL", { type: item.type });
+          logger.info(
+            "Miroir email : aucun destinataire trouvé (skip)",
+            "MAIL",
+            { type: item.type },
+          );
           return;
         }
         // Batch enqueue to avoid giant BCCs
-        const BATCH_SIZE = Math.max(1, Number(process.env.SMTP_BATCH_SIZE || 25));
+        const BATCH_SIZE = Math.max(
+          1,
+          Number(process.env.SMTP_BATCH_SIZE || 25),
+        );
         for (let i = 0; i < allEmails.length; i += BATCH_SIZE) {
           const batch = allEmails.slice(i, i + BATCH_SIZE);
           await enqueueMail(batch, tpl.subject, tpl.body, item.type);
         }
 
-        logger.info("Miroir email (diffusion) enqueued", "MAIL", { type: item.type });
+        logger.info("Miroir email (diffusion) enqueued", "MAIL", {
+          type: item.type,
+        });
         return;
       }
 
       // Map recipient user ids to emails
       const users = await AuthService.getAllUsers();
       const emails = users
-        .filter((u) => Array.isArray(item.recipients) && item.recipients.includes(u.id))
+        .filter(
+          (u) =>
+            Array.isArray(item.recipients) && item.recipients.includes(u.id),
+        )
         .map((u) => u.email)
         .filter(Boolean);
 
       if (emails.length === 0) {
-        logger.info("Miroir email : aucun destinataire trouvé (skip)", "MAIL", { type: item.type });
+        logger.info("Miroir email : aucun destinataire trouvé (skip)", "MAIL", {
+          type: item.type,
+        });
         return;
       }
 
@@ -249,9 +265,16 @@ class InMemoryNotificationService {
     // Par défaut, éviter le mirroring email pour les broadcasts automatiques
     // Si on veut explicitement envoyer des emails pour un broadcast, passer { skipEmailMirror: false }
     const safeData = Object.assign({}, data || {}, {
-      skipEmailMirror: (data && (data as any).skipEmailMirror) === false ? false : true,
+      skipEmailMirror:
+        (data && (data as any).skipEmailMirror) === false ? false : true,
     });
-    return this.add({ type, title, message, data: safeData, recipients: "all" });
+    return this.add({
+      type,
+      title,
+      message,
+      data: safeData,
+      recipients: "all",
+    });
   }
 
   /**

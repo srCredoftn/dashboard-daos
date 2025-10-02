@@ -209,7 +209,13 @@ export default function DaoDetail() {
       const updated = {
         ...prev,
         tasks: prev.tasks.map((task) =>
-          task.id === taskId ? { ...task, progress: newProgress ?? 0, lastUpdatedAt: new Date().toISOString() } : task,
+          task.id === taskId
+            ? {
+                ...task,
+                progress: newProgress ?? 0,
+                lastUpdatedAt: new Date().toISOString(),
+              }
+            : task,
         ),
       } as Dao;
       setUnsavedChanges(true);
@@ -223,7 +229,13 @@ export default function DaoDetail() {
         ? {
             ...prev,
             tasks: prev.tasks.map((task) =>
-              task.id === taskId ? { ...task, comment: newComment, lastUpdatedAt: new Date().toISOString() } : task,
+              task.id === taskId
+                ? {
+                    ...task,
+                    comment: newComment,
+                    lastUpdatedAt: new Date().toISOString(),
+                  }
+                : task,
             ),
           }
         : null,
@@ -242,7 +254,9 @@ export default function DaoDetail() {
       return {
         ...prev,
         tasks: prev.tasks.map((task) =>
-          task.id === taskId ? { ...task, ...updates, lastUpdatedAt: new Date().toISOString() } : task,
+          task.id === taskId
+            ? { ...task, ...updates, lastUpdatedAt: new Date().toISOString() }
+            : task,
         ),
       } as Dao;
     });
@@ -250,7 +264,9 @@ export default function DaoDetail() {
   };
 
   const handleTeamUpdate = (newTeam: TeamMember[]) => {
-    setDraftDao((prev) => (prev ? { ...prev, equipe: newTeam } as Dao : prev));
+    setDraftDao((prev) =>
+      prev ? ({ ...prev, equipe: newTeam } as Dao) : prev,
+    );
     setUnsavedChanges(true);
   };
 
@@ -269,7 +285,9 @@ export default function DaoDetail() {
       const updated = {
         ...prev,
         tasks: prev.tasks.map((task) =>
-          task.id === taskId ? { ...task, ...updates, lastUpdatedAt: new Date().toISOString() } : task,
+          task.id === taskId
+            ? { ...task, ...updates, lastUpdatedAt: new Date().toISOString() }
+            : task,
         ),
       } as Dao;
       setUnsavedChanges(true);
@@ -284,7 +302,10 @@ export default function DaoDetail() {
           await taskService.updateTaskName(dao.id, taskId, updates.name);
         } else {
           await taskService.updateTask(dao.id, taskId, {
-            progress: typeof updates.progress === "number" ? updates.progress : undefined,
+            progress:
+              typeof updates.progress === "number"
+                ? updates.progress
+                : undefined,
             comment: updates.comment,
             isApplicable: updates.isApplicable,
             assignedTo: updates.assignedTo,
@@ -294,7 +315,10 @@ export default function DaoDetail() {
           await refreshNotifications();
         } catch {}
       } catch (error) {
-        devLog.error("Erreur lors de la mise à jour immédiate de la tâche:", error);
+        devLog.error(
+          "Erreur lors de la mise à jour immédiate de la tâche:",
+          error,
+        );
       }
     }
   };
@@ -311,7 +335,13 @@ export default function DaoDetail() {
         ? ({
             ...prev,
             tasks: prev.tasks.map((t) =>
-              t.id === taskId ? { ...t, assignedTo: memberIds, lastUpdatedAt: new Date().toISOString() } : t,
+              t.id === taskId
+                ? {
+                    ...t,
+                    assignedTo: memberIds,
+                    lastUpdatedAt: new Date().toISOString(),
+                  }
+                : t,
             ),
           } as Dao)
         : prev,
@@ -332,10 +362,16 @@ export default function DaoDetail() {
       try {
         await refreshNotifications();
       } catch {}
-      toast({ title: "Modifications enregistrées", description: "Les changements ont été validés." });
+      toast({
+        title: "Modifications enregistrées",
+        description: "Les changements ont été validés.",
+      });
     } catch (e) {
       devLog.error("Échec de la validation des changements:", e);
-      toast({ title: "Erreur", description: "Impossible de valider les changements." });
+      toast({
+        title: "Erreur",
+        description: "Impossible de valider les changements.",
+      });
     } finally {
       setIsCommitting(false);
     }
@@ -1069,7 +1105,9 @@ export default function DaoDetail() {
                     </div>
                   </div>
                 ) : (
-                  <p className="font-medium break-words">{activeDao?.reference}</p>
+                  <p className="font-medium break-words">
+                    {activeDao?.reference}
+                  </p>
                 )}
               </div>
 
@@ -1081,7 +1119,10 @@ export default function DaoDetail() {
                   <span
                     className={cn(
                       "px-2 py-1 rounded text-sm font-medium blink-attention",
-                      getBlinkingDateClasses(progress, activeDao?.dateDepot || ""),
+                      getBlinkingDateClasses(
+                        progress,
+                        activeDao?.dateDepot || "",
+                      ),
                     )}
                   >
                     {dateInfo.date} ({dateInfo.daysDiffAbs}j{" "}
@@ -1128,7 +1169,9 @@ export default function DaoDetail() {
                     </div>
                   </div>
                 ) : (
-                  <p className="font-medium">{activeDao?.autoriteContractante}</p>
+                  <p className="font-medium">
+                    {activeDao?.autoriteContractante}
+                  </p>
                 )}
               </div>
             </div>
@@ -1184,8 +1227,8 @@ export default function DaoDetail() {
                 )}
               </div>
               <p className="font-medium break-words">
-                {activeDao?.equipe.find((m) => m.role === "chef_equipe")?.name ||
-                  "Non assigné"}
+                {activeDao?.equipe.find((m) => m.role === "chef_equipe")
+                  ?.name || "Non assigné"}
               </p>
 
               <div className="flex items-center justify-between">
@@ -1195,7 +1238,7 @@ export default function DaoDetail() {
                 {(activeDao?.equipe || [])
                   .filter((m) => m.role === "membre_equipe")
                   .map((member) => (
-                  <div
+                    <div
                       key={member.id}
                       className="flex flex-col sm:flex-row sm:items-center gap-2"
                     >

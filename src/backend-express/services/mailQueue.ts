@@ -12,7 +12,7 @@ import { connectToDatabase } from "../config/database";
 
 // lightweight id generator (no external deps)
 function genId() {
-  return `mj_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,9)}`;
+  return `mj_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`;
 }
 
 const DATA_DIR = path.join(__dirname, "..", "data");
@@ -57,7 +57,7 @@ function getMailJobModel() {
       locked: { type: Boolean, default: false },
       failed: { type: Boolean, default: false },
     },
-    { timestamps: false }
+    { timestamps: false },
   );
   MailJobModel = mongoose.model("MailJob", schema);
   return MailJobModel;
@@ -71,7 +71,9 @@ function readQueueFile(): MailJob[] {
     const q = JSON.parse(raw) as MailJob[];
     return Array.isArray(q) ? q : [];
   } catch (e) {
-    logger.warn("Failed to read mail queue file", "MAIL_QUEUE", { message: String((e as Error)?.message) });
+    logger.warn("Failed to read mail queue file", "MAIL_QUEUE", {
+      message: String((e as Error)?.message),
+    });
     return [];
   }
 }
@@ -80,13 +82,20 @@ function writeQueueFile(queue: MailJob[]) {
   try {
     fs.writeFileSync(QUEUE_FILE, JSON.stringify(queue, null, 2), "utf8");
   } catch (e) {
-    logger.error("Failed to write mail queue file", "MAIL_QUEUE", { message: String((e as Error)?.message) });
+    logger.error("Failed to write mail queue file", "MAIL_QUEUE", {
+      message: String((e as Error)?.message),
+    });
   }
 }
 
 const USE_MONGO = String(process.env.USE_MONGO || "").toLowerCase() === "true";
 
-export async function enqueueMail(to: string | string[], subject: string, body: string, type?: string) {
+export async function enqueueMail(
+  to: string | string[],
+  subject: string,
+  body: string,
+  type?: string,
+) {
   const recipients = Array.isArray(to) ? to.filter(Boolean) : [String(to)];
   if (recipients.length === 0) return null;
   const job: MailJob = {
@@ -105,12 +114,25 @@ export async function enqueueMail(to: string | string[], subject: string, body: 
     try {
       await connectToDatabase();
       const M = getMailJobModel();
-      await M.create({ ...job, processed: false, locked: false, failed: false });
+      await M.create({
+        ...job,
+        processed: false,
+        locked: false,
+        failed: false,
+      });
       // kick processing
-      processQueue().catch((e) => logger.warn("Queue process error (mongo)", "MAIL_QUEUE", { message: String((e as Error)?.message) }));
+      processQueue().catch((e) =>
+        logger.warn("Queue process error (mongo)", "MAIL_QUEUE", {
+          message: String((e as Error)?.message),
+        }),
+      );
       return job.id;
     } catch (e) {
-      logger.warn("Failed to enqueue mail in Mongo, falling back to file", "MAIL_QUEUE", { message: String((e as Error)?.message) });
+      logger.warn(
+        "Failed to enqueue mail in Mongo, falling back to file",
+        "MAIL_QUEUE",
+        { message: String((e as Error)?.message) },
+      );
       // fall through to file fallback
     }
   }
@@ -120,7 +142,11 @@ export async function enqueueMail(to: string | string[], subject: string, body: 
   q.push(job);
   writeQueueFile(q);
   // trigger background processing (non-blocking)
-  processQueue().catch((e) => logger.warn("Queue process error (file)", "MAIL_QUEUE", { message: String((e as Error)?.message) }));
+  processQueue().catch((e) =>
+    logger.warn("Queue process error (file)", "MAIL_QUEUE", {
+      message: String((e as Error)?.message),
+    }),
+  );
   return job.id;
 }
 
@@ -144,7 +170,11 @@ export async function getQueue() {
         failed: d.failed,
       }));
     } catch (e) {
-      logger.warn("Failed to read mail queue from Mongo, falling back to file", "MAIL_QUEUE", { message: String((e as Error)?.message) });
+      logger.warn(
+        "Failed to read mail queue from Mongo, falling back to file",
+        "MAIL_QUEUE",
+        { message: String((e as Error)?.message) },
+      );
       return readQueueFile();
     }
   }
@@ -165,10 +195,17 @@ export async function processQueue() {
 
         // Try to atomically fetch and lock one job ready for processing
         const doc = await M.findOneAndUpdate(
-          { nextAttemptAt: { $lte: now }, processed: false, failed: false, locked: false },
+          {
+            nextAttemptAt: { $lte: now },
+            processed: false,
+            failed: false,
+            locked: false,
+          },
           { $set: { locked: true } },
           { sort: { nextAttemptAt: 1 }, returnDocument: "after" as any },
-        ).lean().exec();
+        )
+          .lean()
+          .exec();
 
         if (!doc) return;
 
@@ -178,13 +215,44 @@ export async function processQueue() {
           // remove or mark processed
           // Save into logs for history before removing
           try {
-            const LogModel = mongoose.models.MailJobLog || mongoose.model("MailJobLog", new mongoose.Schema({ id: String, to: [String], subject: String, body: String, type: String, attempts: Number, lastError: String, createdAt: String, processedAt: String, status: String }));
-            await LogModel.create({ id: job.id, to: job.to, subject: job.subject, body: job.body, type: job.type, attempts: job.attempts || 0, lastError: job.lastError || null, createdAt: job.createdAt, processedAt: new Date().toISOString(), status: "sent" });
+            const LogModel =
+              mongoose.models.MailJobLog ||
+              mongoose.model(
+                "MailJobLog",
+                new mongoose.Schema({
+                  id: String,
+                  to: [String],
+                  subject: String,
+                  body: String,
+                  type: String,
+                  attempts: Number,
+                  lastError: String,
+                  createdAt: String,
+                  processedAt: String,
+                  status: String,
+                }),
+              );
+            await LogModel.create({
+              id: job.id,
+              to: job.to,
+              subject: job.subject,
+              body: job.body,
+              type: job.type,
+              attempts: job.attempts || 0,
+              lastError: job.lastError || null,
+              createdAt: job.createdAt,
+              processedAt: new Date().toISOString(),
+              status: "sent",
+            });
           } catch (e) {
-            logger.warn("Failed to write mail job log (mongo)", "MAIL_QUEUE", { message: String((e as Error)?.message) });
+            logger.warn("Failed to write mail job log (mongo)", "MAIL_QUEUE", {
+              message: String((e as Error)?.message),
+            });
           }
           await M.deleteOne({ id: job.id }).exec();
-          logger.info(`Mail job sent (mongo): ${job.id}`, "MAIL_QUEUE", { toCount: (job.to || []).length });
+          logger.info(`Mail job sent (mongo): ${job.id}`, "MAIL_QUEUE", {
+            toCount: (job.to || []).length,
+          });
         } catch (e) {
           const errMsg = String((e as Error)?.message || e);
           const attempts = (job.attempts || 0) + 1;
@@ -202,31 +270,80 @@ export async function processQueue() {
           }
           await M.updateOne({ id: job.id }, { $set: update }).exec();
 
-          logger.error("Mail job failed (mongo)", "MAIL_QUEUE", { id: job.id, attempts, error: errMsg });
+          logger.error("Mail job failed (mongo)", "MAIL_QUEUE", {
+            id: job.id,
+            attempts,
+            error: errMsg,
+          });
 
           if (attempts >= DEFAULT_MAX_ATTEMPTS) {
             try {
-              const LogModel = mongoose.models.MailJobLog || mongoose.model("MailJobLog", new mongoose.Schema({ id: String, to: [String], subject: String, body: String, type: String, attempts: Number, lastError: String, createdAt: String, processedAt: String, status: String }));
-              await LogModel.create({ id: job.id, to: job.to, subject: job.subject, body: job.body, type: job.type, attempts, lastError: errMsg, createdAt: job.createdAt, processedAt: new Date().toISOString(), status: "failed" });
+              const LogModel =
+                mongoose.models.MailJobLog ||
+                mongoose.model(
+                  "MailJobLog",
+                  new mongoose.Schema({
+                    id: String,
+                    to: [String],
+                    subject: String,
+                    body: String,
+                    type: String,
+                    attempts: Number,
+                    lastError: String,
+                    createdAt: String,
+                    processedAt: String,
+                    status: String,
+                  }),
+                );
+              await LogModel.create({
+                id: job.id,
+                to: job.to,
+                subject: job.subject,
+                body: job.body,
+                type: job.type,
+                attempts,
+                lastError: errMsg,
+                createdAt: job.createdAt,
+                processedAt: new Date().toISOString(),
+                status: "failed",
+              });
             } catch (e) {
-              logger.warn("Failed to write mail job failure log (mongo)", "MAIL_QUEUE", { message: String((e as Error)?.message) });
+              logger.warn(
+                "Failed to write mail job failure log (mongo)",
+                "MAIL_QUEUE",
+                { message: String((e as Error)?.message) },
+              );
             }
             try {
-              const { NotificationService } = await import("./notificationService");
+              const { NotificationService } = await import(
+                "./notificationService"
+              );
               await NotificationService.add({
                 type: "system",
                 title: "Erreur d'envoi d'email",
                 message: `Échec d'envoi d'email vers ${(job.to || []).length} destinataire(s). Voir logs.`,
-                data: { skipEmailMirror: true, emailError: true, jobId: job.id, lastError: errMsg },
+                data: {
+                  skipEmailMirror: true,
+                  emailError: true,
+                  jobId: job.id,
+                  lastError: errMsg,
+                },
                 recipients: "all",
               });
             } catch (_) {
-              logger.warn("Failed to create system notification for mail job failure (mongo)", "MAIL_QUEUE");
+              logger.warn(
+                "Failed to create system notification for mail job failure (mongo)",
+                "MAIL_QUEUE",
+              );
             }
           }
         }
       } catch (e) {
-        logger.warn("Mongo queue processing failed, skipping this cycle", "MAIL_QUEUE", { message: String((e as Error)?.message) });
+        logger.warn(
+          "Mongo queue processing failed, skipping this cycle",
+          "MAIL_QUEUE",
+          { message: String((e as Error)?.message) },
+        );
       }
       return;
     }
@@ -242,7 +359,9 @@ export async function processQueue() {
         const q = JSON.parse(raw) as any[];
         return Array.isArray(q) ? q : [];
       } catch (e) {
-        logger.warn("Failed to read mail queue log file", "MAIL_QUEUE", { message: String((e as Error)?.message) });
+        logger.warn("Failed to read mail queue log file", "MAIL_QUEUE", {
+          message: String((e as Error)?.message),
+        });
         return [];
       }
     }
@@ -252,7 +371,9 @@ export async function processQueue() {
         logs.unshift(entry);
         fs.writeFileSync(LOG_FILE, JSON.stringify(logs, null, 2), "utf8");
       } catch (e) {
-        logger.warn("Failed to append mail queue log file", "MAIL_QUEUE", { message: String((e as Error)?.message) });
+        logger.warn("Failed to append mail queue log file", "MAIL_QUEUE", {
+          message: String((e as Error)?.message),
+        });
       }
     }
     for (let i = 0; i < queue.length; i++) {
@@ -262,13 +383,28 @@ export async function processQueue() {
         await sendEmail(job.to, job.subject, job.body, job.type as any);
         // append success to log
         try {
-          appendLogFile({ id: job.id, to: job.to, subject: job.subject, body: job.body, type: job.type, attempts: job.attempts || 0, lastError: job.lastError || null, createdAt: job.createdAt, processedAt: new Date().toISOString(), status: "sent" });
+          appendLogFile({
+            id: job.id,
+            to: job.to,
+            subject: job.subject,
+            body: job.body,
+            type: job.type,
+            attempts: job.attempts || 0,
+            lastError: job.lastError || null,
+            createdAt: job.createdAt,
+            processedAt: new Date().toISOString(),
+            status: "sent",
+          });
         } catch (e) {
-          logger.warn("Failed to write mail log (file)", "MAIL_QUEUE", { message: String((e as Error)?.message) });
+          logger.warn("Failed to write mail log (file)", "MAIL_QUEUE", {
+            message: String((e as Error)?.message),
+          });
         }
         queue = queue.filter((j) => j.id !== job.id);
         writeQueueFile(queue);
-        logger.info(`Mail job sent: ${job.id}`, "MAIL_QUEUE", { toCount: job.to.length });
+        logger.info(`Mail job sent: ${job.id}`, "MAIL_QUEUE", {
+          toCount: job.to.length,
+        });
       } catch (e) {
         const errMsg = String((e as Error)?.message || e);
         job.attempts = (job.attempts || 0) + 1;
@@ -277,24 +413,53 @@ export async function processQueue() {
         job.nextAttemptAt = Date.now() + Math.min(delay, 60 * 60 * 1000);
         queue = queue.map((j) => (j.id === job.id ? job : j));
         writeQueueFile(queue);
-        logger.error("Mail job failed", "MAIL_QUEUE", { id: job.id, attempts: job.attempts, error: errMsg });
+        logger.error("Mail job failed", "MAIL_QUEUE", {
+          id: job.id,
+          attempts: job.attempts,
+          error: errMsg,
+        });
         if (job.attempts >= DEFAULT_MAX_ATTEMPTS) {
           try {
-            appendLogFile({ id: job.id, to: job.to, subject: job.subject, body: job.body, type: job.type, attempts: job.attempts, lastError: job.lastError, createdAt: job.createdAt, processedAt: new Date().toISOString(), status: "failed" });
+            appendLogFile({
+              id: job.id,
+              to: job.to,
+              subject: job.subject,
+              body: job.body,
+              type: job.type,
+              attempts: job.attempts,
+              lastError: job.lastError,
+              createdAt: job.createdAt,
+              processedAt: new Date().toISOString(),
+              status: "failed",
+            });
           } catch (e) {
-            logger.warn("Failed to write mail failure log (file)", "MAIL_QUEUE", { message: String((e as Error)?.message) });
+            logger.warn(
+              "Failed to write mail failure log (file)",
+              "MAIL_QUEUE",
+              { message: String((e as Error)?.message) },
+            );
           }
           try {
-            const { NotificationService } = await import("./notificationService");
+            const { NotificationService } = await import(
+              "./notificationService"
+            );
             await NotificationService.add({
               type: "system",
               title: "Erreur d'envoi d'email",
               message: `Échec d'envoi d'email vers ${job.to.length} destinataire(s). Voir logs.`,
-              data: { skipEmailMirror: true, emailError: true, jobId: job.id, lastError: job.lastError },
+              data: {
+                skipEmailMirror: true,
+                emailError: true,
+                jobId: job.id,
+                lastError: job.lastError,
+              },
               recipients: "all",
             });
           } catch (_) {
-            logger.warn("Failed to create system notification for mail job failure", "MAIL_QUEUE");
+            logger.warn(
+              "Failed to create system notification for mail job failure",
+              "MAIL_QUEUE",
+            );
           }
         }
       }
@@ -306,7 +471,11 @@ export async function processQueue() {
 
 // Background processor interval
 setInterval(() => {
-  processQueue().catch((e) => logger.warn("processQueue interval error", "MAIL_QUEUE", { message: String((e as Error)?.message) }));
+  processQueue().catch((e) =>
+    logger.warn("processQueue interval error", "MAIL_QUEUE", {
+      message: String((e as Error)?.message),
+    }),
+  );
 }, 2000);
 
 // Export helper to requeue a job by id (reset attempts)
@@ -317,11 +486,25 @@ export async function requeueJob(id: string) {
       const M = getMailJobModel();
       const doc = await M.findOne({ id }).exec();
       if (!doc) return false;
-      await M.updateOne({ id }, { $set: { attempts: 0, lastError: null, nextAttemptAt: Date.now(), failed: false } }).exec();
+      await M.updateOne(
+        { id },
+        {
+          $set: {
+            attempts: 0,
+            lastError: null,
+            nextAttemptAt: Date.now(),
+            failed: false,
+          },
+        },
+      ).exec();
       processQueue().catch(() => {});
       return true;
     } catch (e) {
-      logger.warn("Failed to requeue job in Mongo, falling back to file", "MAIL_QUEUE", { message: String((e as Error)?.message) });
+      logger.warn(
+        "Failed to requeue job in Mongo, falling back to file",
+        "MAIL_QUEUE",
+        { message: String((e as Error)?.message) },
+      );
     }
   }
 

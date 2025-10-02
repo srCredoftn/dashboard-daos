@@ -354,8 +354,13 @@ export default function createAdminRoutes(setBootId: (id: string) => string) {
           const mongoose = await import("mongoose");
           const conn = await import("../config/database");
           await conn.connectToDatabase();
-          const MailJobLog = mongoose.models.MailJobLog || mongoose.model("MailJobLog");
-          const docs = await MailJobLog.find().sort({ processedAt: -1 }).limit(200).lean().exec();
+          const MailJobLog =
+            mongoose.models.MailJobLog || mongoose.model("MailJobLog");
+          const docs = await MailJobLog.find()
+            .sort({ processedAt: -1 })
+            .limit(200)
+            .lean()
+            .exec();
           return res.json({ ok: true, logs: docs });
         } catch (e) {
           // fallthrough to file
@@ -365,7 +370,14 @@ export default function createAdminRoutes(setBootId: (id: string) => string) {
       // File fallback
       const fs = await import("fs");
       const path = await import("path");
-      const file = path.join(__dirname, "..", "services", "..", "data", "mail-queue-log.json");
+      const file = path.join(
+        __dirname,
+        "..",
+        "services",
+        "..",
+        "data",
+        "mail-queue-log.json",
+      );
       try {
         if (!fs.existsSync(file)) return res.json({ ok: true, logs: [] });
         const raw = fs.readFileSync(file, "utf8");
@@ -378,7 +390,6 @@ export default function createAdminRoutes(setBootId: (id: string) => string) {
       return res.status(500).json({ ok: false, error: (e as Error).message });
     }
   });
-
 
   // POST /api/admin/mail-queue/requeue - requeue a failed job by id
   router.post("/mail-queue/requeue", async (req, res) => {

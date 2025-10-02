@@ -297,7 +297,12 @@ router.post(
       // Notifier la plateforme et envoyer un e-mail à tous les utilisateurs
       try {
         const t = tplDaoCreated(newDao);
-        NotificationService.broadcast(t.type, t.title, t.message, Object.assign({}, t.data || {}, { skipEmailMirror: false }));
+        NotificationService.broadcast(
+          t.type,
+          t.title,
+          t.message,
+          Object.assign({}, t.data || {}, { skipEmailMirror: false }),
+        );
       } catch (_) {}
 
       res.status(201).json(newDao);
@@ -451,7 +456,11 @@ router.put(
               "role_update",
               "Modification de l'équipe",
               changed.join(", "),
-              Object.assign({}, { daoId: updated.id, changes: changed }, { skipEmailMirror: false }),
+              Object.assign(
+                {},
+                { daoId: updated.id, changes: changed },
+                { skipEmailMirror: false },
+              ),
             );
           }
         }
@@ -463,7 +472,8 @@ router.put(
             const aa = [...(a || [])].sort();
             const bb = [...(b || [])].sort();
             if (aa.length !== bb.length) return false;
-            for (let i = 0; i < aa.length; i++) if (aa[i] !== bb[i]) return false;
+            for (let i = 0; i < aa.length; i++)
+              if (aa[i] !== bb[i]) return false;
             return true;
           };
 
@@ -504,8 +514,10 @@ router.put(
                 | "assignees"
                 | "comment"
                 | "general" = "general";
-              if ((prev.progress ?? 0) !== (curr.progress ?? 0)) changeType = "progress";
-              else if (prev.isApplicable !== curr.isApplicable) changeType = "applicability";
+              if ((prev.progress ?? 0) !== (curr.progress ?? 0))
+                changeType = "progress";
+              else if (prev.isApplicable !== curr.isApplicable)
+                changeType = "applicability";
               else if (added.length || removed.length) changeType = "assignees";
               else if (prev.comment !== curr.comment) changeType = "comment";
 
@@ -516,27 +528,39 @@ router.put(
                 changeType,
                 added,
                 removed,
-                comment: prev.comment !== curr.comment ? curr.comment : undefined,
+                comment:
+                  prev.comment !== curr.comment ? curr.comment : undefined,
               });
 
-              NotificationService.broadcast(notif.type, notif.title, notif.message, Object.assign({}, notif.data || {}, { skipEmailMirror: false }));
+              NotificationService.broadcast(
+                notif.type,
+                notif.title,
+                notif.message,
+                Object.assign({}, notif.data || {}, { skipEmailMirror: false }),
+              );
             } catch (_) {}
           }
         }
 
         // Mark on res.locals to inform later step whether tasks changed
-        (res as any).hasTaskChanges = (res as any).hasTaskChanges || hasTaskChanges;
+        (res as any).hasTaskChanges =
+          (res as any).hasTaskChanges || hasTaskChanges;
       } catch (_) {}
 
       // Always broadcast a general DAO update and email all users
       try {
         const changedKeys = new Set<string>();
         if (before && updated) {
-          if (before.numeroListe !== updated.numeroListe) changedKeys.add("numeroListe");
-          if (before.objetDossier !== updated.objetDossier) changedKeys.add("objetDossier");
-          if (before.reference !== updated.reference) changedKeys.add("reference");
-          if (before.autoriteContractante !== updated.autoriteContractante) changedKeys.add("autoriteContractante");
-          if (before.dateDepot !== updated.dateDepot) changedKeys.add("dateDepot");
+          if (before.numeroListe !== updated.numeroListe)
+            changedKeys.add("numeroListe");
+          if (before.objetDossier !== updated.objetDossier)
+            changedKeys.add("objetDossier");
+          if (before.reference !== updated.reference)
+            changedKeys.add("reference");
+          if (before.autoriteContractante !== updated.autoriteContractante)
+            changedKeys.add("autoriteContractante");
+          if (before.dateDepot !== updated.dateDepot)
+            changedKeys.add("dateDepot");
           if ((res as any).teamChanged === true) {
             changedKeys.add("chef");
             changedKeys.add("membres");
@@ -545,7 +569,12 @@ router.put(
 
         // Always send DAO updated notification
         const t = tplDaoUpdated(updated, changedKeys);
-        NotificationService.broadcast(t.type, t.title, t.message, Object.assign({}, t.data || {}, { skipEmailMirror: false }));
+        NotificationService.broadcast(
+          t.type,
+          t.title,
+          t.message,
+          Object.assign({}, t.data || {}, { skipEmailMirror: false }),
+        );
       } catch (_) {}
 
       logger.audit("DAO mis à jour avec succès", req.user?.id, req.ip);
@@ -691,7 +720,12 @@ router.delete(
 
       try {
         const t = tplDaoDeleted(last);
-        NotificationService.broadcast(t.type, t.title, t.message, Object.assign({}, t.data || {}, { skipEmailMirror: false }));
+        NotificationService.broadcast(
+          t.type,
+          t.title,
+          t.message,
+          Object.assign({}, t.data || {}, { skipEmailMirror: false }),
+        );
       } catch (_) {}
 
       logger.audit("Dernier DAO supprimé avec succès", req.user?.id, req.ip);
@@ -971,20 +1005,31 @@ router.post(
       const { memberId } = req.body || {};
 
       if (!id) {
-        return res.status(400).json({ error: "ID du DAO manquant", code: "MISSING_DAO_ID" });
+        return res
+          .status(400)
+          .json({ error: "ID du DAO manquant", code: "MISSING_DAO_ID" });
       }
       if (!memberId || typeof memberId !== "string") {
-        return res.status(400).json({ error: "memberId requis", code: "MISSING_MEMBER_ID" });
+        return res
+          .status(400)
+          .json({ error: "memberId requis", code: "MISSING_MEMBER_ID" });
       }
 
       const dao = await DaoService.getDaoById(id);
       if (!dao) {
-        return res.status(404).json({ error: "DAO introuvable", code: "DAO_NOT_FOUND" });
+        return res
+          .status(404)
+          .json({ error: "DAO introuvable", code: "DAO_NOT_FOUND" });
       }
 
       const member = dao.equipe.find((m) => m.id === memberId);
       if (!member) {
-        return res.status(404).json({ error: "Membre introuvable dans l'équipe", code: "MEMBER_NOT_FOUND" });
+        return res
+          .status(404)
+          .json({
+            error: "Membre introuvable dans l'équipe",
+            code: "MEMBER_NOT_FOUND",
+          });
       }
 
       // Determine previous leader (if any)
@@ -992,7 +1037,8 @@ router.post(
 
       // Build new team roles: promote target, demote previous leader if different
       const newEquipe: TeamMember[] = dao.equipe.map((m) => {
-        if (m.id === memberId) return { ...m, role: "chef_equipe" as const } as TeamMember;
+        if (m.id === memberId)
+          return { ...m, role: "chef_equipe" as const } as TeamMember;
         if (prevLeader && m.id === prevLeader.id && prevLeader.id !== memberId)
           return { ...m, role: "membre_equipe" as const } as TeamMember;
         return m as TeamMember;
@@ -1001,25 +1047,39 @@ router.post(
       // Persist change server-side (ensure persisted before broadcasting)
       const updated = await DaoService.updateDao(id, { equipe: newEquipe });
       if (!updated) {
-        return res.status(500).json({ error: "Échec de mise à jour de l'équipe", code: "UPDATE_FAILED" });
+        return res
+          .status(500)
+          .json({
+            error: "Échec de mise à jour de l'équipe",
+            code: "UPDATE_FAILED",
+          });
       }
 
       // Prepare change message
       const changes: string[] = [];
       if (prevLeader && prevLeader.id !== memberId) {
-        changes.push(`${member.name} promu chef d'équipe (remplace ${prevLeader.name})`);
+        changes.push(
+          `${member.name} promu chef d'équipe (remplace ${prevLeader.name})`,
+        );
       } else {
         changes.push(`${member.name} promu chef d'équipe`);
       }
 
       // Broadcast a role_update notification after persistence.
       try {
-        NotificationService.broadcast("role_update", "Modification de l'équipe", changes.join(", "), Object.assign({}, { daoId: updated.id }, { skipEmailMirror: false }));
+        NotificationService.broadcast(
+          "role_update",
+          "Modification de l'équipe",
+          changes.join(", "),
+          Object.assign({}, { daoId: updated.id }, { skipEmailMirror: false }),
+        );
       } catch (_) {}
 
       return res.json(updated);
     } catch (error) {
-      logger.error("Erreur lors de la promotion du membre", "PROMOTE_MEMBER", { message: (error as Error)?.message });
+      logger.error("Erreur lors de la promotion du membre", "PROMOTE_MEMBER", {
+        message: (error as Error)?.message,
+      });
       return res.status(500).json({ error: "Échec de la promotion du membre" });
     }
   },
