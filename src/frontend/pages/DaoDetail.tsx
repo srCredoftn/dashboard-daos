@@ -912,7 +912,7 @@ export default function DaoDetail() {
               <div className="min-w-0">
                 <h1 className="text-base font-bold truncate">Détails DAO</h1>
                 <p className="text-xs text-muted-foreground truncate">
-                  {dao.numeroListe} • {dao.reference}
+                  {activeDao?.numeroListe} • {activeDao?.reference}
                 </p>
               </div>
             </div>
@@ -951,7 +951,7 @@ export default function DaoDetail() {
               <div>
                 <h1 className="text-lg lg:text-xl font-bold">Détails DAO</h1>
                 <p className="text-sm text-muted-foreground">
-                  {dao.numeroListe} • {dao.reference}
+                  {activeDao?.numeroListe} • {activeDao?.reference}
                 </p>
               </div>
             </div>
