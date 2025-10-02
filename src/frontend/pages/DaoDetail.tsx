@@ -258,49 +258,43 @@ export default function DaoDetail() {
   const handleTaskUpdate = async (
     taskId: number,
     updates: Partial<DaoTask>,
+    opts?: { immediate?: boolean },
   ) => {
-    if (!dao) return;
+    // By default, apply changes to the draft and mark as unsaved. If immediate=true, persist now.
+    if (!activeDao) return;
 
-    try {
-      // MAJ optimiste locale (timestamp)
-      setDao((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          tasks: prev.tasks.map((task) =>
-            task.id === taskId
-              ? { ...task, ...updates, lastUpdatedAt: new Date().toISOString() }
-              : task,
-          ),
-        };
-      });
+    // Apply to draft
+    setDraftDao((prev) => {
+      if (!prev) return prev;
+      const updated = {
+        ...prev,
+        tasks: prev.tasks.map((task) =>
+          task.id === taskId ? { ...task, ...updates, lastUpdatedAt: new Date().toISOString() } : task,
+        ),
+      } as Dao;
+      setUnsavedChanges(true);
+      return updated;
+    });
 
-      if (updates.name !== undefined) {
-        await taskService.updateTaskName(dao.id, taskId, updates.name);
-      } else {
-        await taskService.updateTask(dao.id, taskId, {
-          progress:
-            typeof updates.progress === "number" ? updates.progress : undefined,
-          comment: updates.comment,
-          isApplicable: updates.isApplicable,
-          assignedTo: updates.assignedTo,
-        });
-      }
-
+    if (opts?.immediate) {
+      // fallback to previous behaviour (persist single task)
       try {
-        await refreshNotifications();
-      } catch {}
-    } catch (error) {
-      devLog.error("Erreur lors de la mise à jour de la tâche:", error);
-      setError("Erreur lors de la mise à jour de la tâche");
-      try {
-        const freshDao = await apiService.getDaoById(dao.id);
-        setDao(freshDao);
-      } catch (reloadError) {
-        devLog.error(
-          "Erreur lors du rechargement du DAO après échec de mise à jour:",
-          reloadError,
-        );
+        if (!dao) return;
+        if (updates.name !== undefined) {
+          await taskService.updateTaskName(dao.id, taskId, updates.name);
+        } else {
+          await taskService.updateTask(dao.id, taskId, {
+            progress: typeof updates.progress === "number" ? updates.progress : undefined,
+            comment: updates.comment,
+            isApplicable: updates.isApplicable,
+            assignedTo: updates.assignedTo,
+          });
+        }
+        try {
+          await refreshNotifications();
+        } catch {}
+      } catch (error) {
+        devLog.error("Erreur lors de la mise à jour immédiate de la tâche:", error);
       }
     }
   };
