@@ -1247,17 +1247,39 @@ export default function DaoDetail() {
                 </span>
               </div>
             </div>
+
+            {/* Bouton Valider pour DAOs non-dernier */}
+            {!isLastDao && isAdmin() && (
+              <div className="mt-6 flex justify-center">
+                <Button
+                  variant="default"
+                  size="default"
+                  disabled={!unsavedChanges || isCommitting}
+                  onClick={() => handleCommitChanges()}
+                >
+                  {isCommitting ? "Validation..." : "Valider les changements"}
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 
         {isAdmin() && isLastDao && (
-          <div className="mt-8 flex justify-center">
+          <div className="mt-8 flex justify-center items-center gap-4">
             <DeleteLastDaoButton
               hasDaos={true}
               onDeleted={() => {
                 navigate("/");
               }}
             />
+            <Button
+              variant="default"
+              size="default"
+              disabled={!unsavedChanges || isCommitting}
+              onClick={() => handleCommitChanges()}
+            >
+              {isCommitting ? "Validation..." : "Valider les changements"}
+            </Button>
           </div>
         )}
       </main>
