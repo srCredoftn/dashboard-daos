@@ -4,7 +4,7 @@ Domaine: Backend/Services
 Exports: NotificationType, ServerNotification, NotificationService
 Liens: appels /api, utils de fetch, types @shared/*
 */
-import { emailAllUsers, sendEmail } from "./txEmail";
+import { /* emailAllUsers, sendEmail removed - mail queue used instead */ } from "./txEmail";
 import { AuthService } from "./authService";
 import { logger } from "../utils/logger";
 import { MongoNotificationRepository } from "../repositories/mongoNotificationRepository";
