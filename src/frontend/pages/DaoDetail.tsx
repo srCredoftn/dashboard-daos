@@ -1106,7 +1106,7 @@ export default function DaoDetail() {
                     </div>
                   </div>
                 ) : (
-                  <p className="font-medium">{dao.autoriteContractante}</p>
+                  <p className="font-medium">{activeDao?.autoriteContractante}</p>
                 )}
               </div>
             </div>
