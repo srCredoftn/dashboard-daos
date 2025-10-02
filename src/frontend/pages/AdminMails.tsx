@@ -33,15 +33,37 @@ export default function AdminMails() {
       const headers: any = { "Content-Type": "application/json" };
       if (token) headers.Authorization = `Bearer ${token}`;
 
-      const [qRes, logsRes, diagRes] = await Promise.all([
-        fetch("/api/admin/mail-queue", { headers }).then((r) => r.json()),
-        fetch("/api/admin/mail-logs", { headers }).then((r) => r.json()),
-        fetch("/api/admin/mail-diagnostics", { headers }).then((r) => r.json()),
-      ]);
+      // Helper to fetch and parse JSON safely (avoid reusing response body)
+      async function fetchJson(url: string) {
+        const res = await fetch(url, { headers: { ...headers } });
+        const ct = res.headers.get("content-type") || "";
+        if (!res.ok) {
+          // try to extract JSON error body, otherwise text
+          if (ct.includes("application/json")) {
+            const json = await res.json().catch(() => null);
+            throw new Error(json?.error || JSON.stringify(json) || `HTTP ${res.status}`);
+          }
+          const txt = await res.text().catch(() => "");
+          throw new Error(txt || `HTTP ${res.status}`);
+        }
+        if (ct.includes("application/json")) return await res.json();
+        // if not JSON, return raw text
+        return await res.text();
+      }
+
+      // Fetch sequentially to avoid potential stream reuse issues on some environments
+      const qRes: any = await fetchJson("/api/admin/mail-queue");
+      const logsRes: any = await fetchJson("/api/admin/mail-logs");
+      const diagRes: any = await fetchJson("/api/admin/mail-diagnostics");
 
       if (qRes?.ok) setQueue(qRes.queue || []);
+      else if (Array.isArray(qRes)) setQueue(qRes as any);
+
       if (logsRes?.ok) setLogs(logsRes.logs || []);
+      else if (Array.isArray(logsRes)) setLogs(logsRes as any);
+
       if (diagRes?.ok) setDiag(diagRes);
+      else if (typeof diagRes === "object") setDiag(diagRes);
     } catch (e) {
       console.error(e);
     } finally {
