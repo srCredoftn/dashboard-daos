@@ -1052,7 +1052,7 @@ export default function DaoDetail() {
                     <Input
                       value={tempReference}
                       onChange={(e) => setTempReference(e.target.value)}
-                      placeholder="Saisir la référence..."
+                      placeholder="Saisir la r��férence..."
                       className="font-medium"
                     />
                     <div className="flex gap-2">
@@ -1069,7 +1069,7 @@ export default function DaoDetail() {
                     </div>
                   </div>
                 ) : (
-                  <p className="font-medium break-words">{dao.reference}</p>
+                  <p className="font-medium break-words">{activeDao?.reference}</p>
                 )}
               </div>
 
