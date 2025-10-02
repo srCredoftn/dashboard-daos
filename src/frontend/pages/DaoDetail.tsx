@@ -218,16 +218,17 @@ export default function DaoDetail() {
   };
 
   const handleTaskCommentChange = (taskId: number, newComment: string) => {
-    setDao((prev) =>
+    setDraftDao((prev) =>
       prev
         ? {
             ...prev,
             tasks: prev.tasks.map((task) =>
-              task.id === taskId ? { ...task, comment: newComment } : task,
+              task.id === taskId ? { ...task, comment: newComment, lastUpdatedAt: new Date().toISOString() } : task,
             ),
           }
         : null,
     );
+    setUnsavedChanges(true);
   };
 
   const handleTaskApplicableChange = (taskId: number, applicable: boolean) => {
