@@ -246,7 +246,12 @@ class InMemoryNotificationService {
     message: string,
     data?: Record<string, any>,
   ) {
-    return this.add({ type, title, message, data, recipients: "all" });
+    // Par défaut, éviter le mirroring email pour les broadcasts automatiques
+    // Si on veut explicitement envoyer des emails pour un broadcast, passer { skipEmailMirror: false }
+    const safeData = Object.assign({}, data || {}, {
+      skipEmailMirror: (data && (data as any).skipEmailMirror) === false ? false : true,
+    });
+    return this.add({ type, title, message, data: safeData, recipients: "all" });
   }
 
   /**
