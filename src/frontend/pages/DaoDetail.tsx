@@ -1177,14 +1177,14 @@ export default function DaoDetail() {
                 <Label className="text-sm font-medium">Chef d'équipe</Label>
                 {isAdmin() && (
                   <TeamEditDialog
-                    currentTeam={dao.equipe}
+                    currentTeam={activeDao?.equipe || []}
                     onTeamUpdate={handleTeamUpdate}
                     type="both"
                   />
                 )}
               </div>
               <p className="font-medium break-words">
-                {dao.equipe.find((m) => m.role === "chef_equipe")?.name ||
+                {activeDao?.equipe.find((m) => m.role === "chef_equipe")?.name ||
                   "Non assigné"}
               </p>
 
