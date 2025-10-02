@@ -989,7 +989,7 @@ export default function DaoDetail() {
                 ) : (
                   <div className="flex items-start gap-3">
                     <CardTitle className="text-lg md:text-xl">
-                      {dao.objetDossier}
+                      {activeDao?.objetDossier}
                     </CardTitle>
                     {isAdmin() && (
                       <Button
