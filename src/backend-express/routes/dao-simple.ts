@@ -297,7 +297,7 @@ router.post(
       // Notifier la plateforme et envoyer un e-mail à tous les utilisateurs
       try {
         const t = tplDaoCreated(newDao);
-        NotificationService.broadcast(t.type, t.title, t.message, t.data);
+        NotificationService.broadcast(t.type, t.title, t.message, Object.assign({}, t.data || {}, { skipEmailMirror: false }));
       } catch (_) {}
 
       res.status(201).json(newDao);
@@ -451,7 +451,7 @@ router.put(
               "role_update",
               "Modification de l'équipe",
               changed.join(", "),
-              { daoId: updated.id, changes: changed },
+              Object.assign({}, { daoId: updated.id, changes: changed }, { skipEmailMirror: false }),
             );
           }
         }
@@ -519,7 +519,7 @@ router.put(
                 comment: prev.comment !== curr.comment ? curr.comment : undefined,
               });
 
-              NotificationService.broadcast(notif.type, notif.title, notif.message, notif.data);
+              NotificationService.broadcast(notif.type, notif.title, notif.message, Object.assign({}, notif.data || {}, { skipEmailMirror: false }));
             } catch (_) {}
           }
         }
@@ -545,7 +545,7 @@ router.put(
 
         // Always send DAO updated notification
         const t = tplDaoUpdated(updated, changedKeys);
-        NotificationService.broadcast(t.type, t.title, t.message, t.data);
+        NotificationService.broadcast(t.type, t.title, t.message, Object.assign({}, t.data || {}, { skipEmailMirror: false }));
       } catch (_) {}
 
       logger.audit("DAO mis à jour avec succès", req.user?.id, req.ip);
@@ -691,7 +691,7 @@ router.delete(
 
       try {
         const t = tplDaoDeleted(last);
-        NotificationService.broadcast(t.type, t.title, t.message, t.data);
+        NotificationService.broadcast(t.type, t.title, t.message, Object.assign({}, t.data || {}, { skipEmailMirror: false }));
       } catch (_) {}
 
       logger.audit("Dernier DAO supprimé avec succès", req.user?.id, req.ip);
@@ -1014,7 +1014,7 @@ router.post(
 
       // Broadcast a role_update notification after persistence.
       try {
-        NotificationService.broadcast("role_update", "Modification de l'équipe", changes.join(", "), { daoId: updated.id });
+        NotificationService.broadcast("role_update", "Modification de l'équipe", changes.join(", "), Object.assign({}, { daoId: updated.id }, { skipEmailMirror: false }));
       } catch (_) {}
 
       return res.json(updated);
