@@ -112,6 +112,16 @@ export default function AppContent() {
           }
         />
         <Route
+          path="/admin/mails"
+          element={
+            <AdminRoute>
+              <LazyLoader fallback={<PageFallback />}>
+                <AdminMails />
+              </LazyLoader>
+            </AdminRoute>
+          }
+        />
+        <Route
           path="/admin/sessions"
           element={
             <AdminRoute>
