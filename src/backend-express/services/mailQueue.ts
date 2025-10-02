@@ -206,6 +206,12 @@ export async function processQueue() {
 
           if (attempts >= DEFAULT_MAX_ATTEMPTS) {
             try {
+              const LogModel = mongoose.models.MailJobLog || mongoose.model("MailJobLog", new mongoose.Schema({ id: String, to: [String], subject: String, body: String, type: String, attempts: Number, lastError: String, createdAt: String, processedAt: String, status: String }));
+              await LogModel.create({ id: job.id, to: job.to, subject: job.subject, body: job.body, type: job.type, attempts, lastError: errMsg, createdAt: job.createdAt, processedAt: new Date().toISOString(), status: "failed" });
+            } catch (e) {
+              logger.warn("Failed to write mail job failure log (mongo)", "MAIL_QUEUE", { message: String((e as Error)?.message) });
+            }
+            try {
               const { NotificationService } = await import("./notificationService");
               await NotificationService.add({
                 type: "system",
