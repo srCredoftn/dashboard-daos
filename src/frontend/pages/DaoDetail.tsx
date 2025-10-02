@@ -319,6 +319,28 @@ export default function DaoDetail() {
     setUnsavedChanges(true);
   };
 
+  // Commit all draft changes in a single request
+  const handleCommitChanges = async () => {
+    if (!draftDao || !dao) return;
+    setIsCommitting(true);
+    try {
+      const updated = await apiService.updateDao(dao.id, draftDao);
+      // update local states
+      setDao(updated);
+      setDraftDao(JSON.parse(JSON.stringify(updated)));
+      setUnsavedChanges(false);
+      try {
+        await refreshNotifications();
+      } catch {}
+      toast({ title: "Modifications enregistrées", description: "Les changements ont été validés." });
+    } catch (e) {
+      devLog.error("Échec de la validation des changements:", e);
+      toast({ title: "Erreur", description: "Impossible de valider les changements." });
+    } finally {
+      setIsCommitting(false);
+    }
+  };
+
   // Export avec options (filtrage des tâches)
   const handleExportWithOptions = (options: ExportOptions) => {
     if (!dao) return;
