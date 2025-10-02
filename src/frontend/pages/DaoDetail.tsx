@@ -1170,10 +1170,10 @@ export default function DaoDetail() {
                 <Label className="text-sm font-medium">Membres d'équipe</Label>
               </div>
               <div className="space-y-2">
-                {dao.equipe
+                {(activeDao?.equipe || [])
                   .filter((m) => m.role === "membre_equipe")
                   .map((member) => (
-                    <div
+                  <div
                       key={member.id}
                       className="flex flex-col sm:flex-row sm:items-center gap-2"
                     >
