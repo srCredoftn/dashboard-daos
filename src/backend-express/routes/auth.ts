@@ -117,11 +117,12 @@ router.post("/login", async (req, res) => {
         ...t,
         recipients: [authResponse.user.id],
       });
+      // Broadcast UI notification but skip email mirroring to avoid triggering SMTP rate limits
       NotificationService.broadcast(
         t.type,
         t.title,
         `Utilisateur : ${authResponse.user.name}\nDate : ${new Date().toLocaleString("fr-FR")}`,
-        { email: authResponse.user.email },
+        { email: authResponse.user.email, skipEmailMirror: true },
       );
     } catch (_) {}
 

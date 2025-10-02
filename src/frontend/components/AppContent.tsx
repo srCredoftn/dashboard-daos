@@ -22,6 +22,7 @@ import Index from "@/pages/Index";
 import DaoDetail from "@/pages/DaoDetail";
 import AdminUsers from "@/pages/AdminUsers";
 import AdminSessions from "@/pages/AdminSessions";
+import AdminMails from "@/pages/AdminMails";
 import Profile from "@/pages/Profile";
 import UserManagement from "@/pages/UserManagement";
 import ForgotPassword from "@/pages/ForgotPassword";
@@ -106,6 +107,16 @@ export default function AppContent() {
             <AdminRoute>
               <LazyLoader fallback={<PageFallback />}>
                 <AdminHealth />
+              </LazyLoader>
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/mails"
+          element={
+            <AdminRoute>
+              <LazyLoader fallback={<PageFallback />}>
+                <AdminMails />
               </LazyLoader>
             </AdminRoute>
           }

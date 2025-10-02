@@ -310,5 +310,110 @@ export default function createAdminRoutes(setBootId: (id: string) => string) {
     }
   });
 
+  // GET /api/admin/mail-queue - list queued mail jobs
+  router.get("/mail-queue", async (req, res) => {
+    try {
+      if (process.env.NODE_ENV === "production") {
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+          return res.status(403).json({ error: "Interdit : jeton manquant" });
+        }
+        const token = authHeader.substring(7);
+        const verified = await AuthService.verifyToken(token);
+        if (!verified || verified.role !== "admin") {
+          return res.status(403).json({ error: "Interdit : jeton invalide" });
+        }
+      }
+      const { getQueue } = await import("../services/mailQueue");
+      const q = await getQueue();
+      return res.json({ ok: true, queue: q });
+    } catch (e) {
+      return res.status(500).json({ ok: false, error: (e as Error).message });
+    }
+  });
+
+  // GET /api/admin/mail-logs - historical sent/failed mail jobs
+  router.get("/mail-logs", async (req, res) => {
+    try {
+      if (process.env.NODE_ENV === "production") {
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+          return res.status(403).json({ error: "Interdit : jeton manquant" });
+        }
+        const token = authHeader.substring(7);
+        const verified = await AuthService.verifyToken(token);
+        if (!verified || verified.role !== "admin") {
+          return res.status(403).json({ error: "Interdit : jeton invalide" });
+        }
+      }
+
+      // Prefer Mongo logs when available
+      const { USE_MONGO } = process.env as any;
+      if ((USE_MONGO || "").toLowerCase() === "true") {
+        try {
+          const mongoose = await import("mongoose");
+          const conn = await import("../config/database");
+          await conn.connectToDatabase();
+          const MailJobLog =
+            mongoose.models.MailJobLog || mongoose.model("MailJobLog");
+          const docs = await MailJobLog.find()
+            .sort({ processedAt: -1 })
+            .limit(200)
+            .lean()
+            .exec();
+          return res.json({ ok: true, logs: docs });
+        } catch (e) {
+          // fallthrough to file
+        }
+      }
+
+      // File fallback
+      const fs = await import("fs");
+      const path = await import("path");
+      const file = path.join(
+        __dirname,
+        "..",
+        "services",
+        "..",
+        "data",
+        "mail-queue-log.json",
+      );
+      try {
+        if (!fs.existsSync(file)) return res.json({ ok: true, logs: [] });
+        const raw = fs.readFileSync(file, "utf8");
+        const logs = JSON.parse(raw || "[]");
+        return res.json({ ok: true, logs });
+      } catch (e) {
+        return res.json({ ok: true, logs: [] });
+      }
+    } catch (e) {
+      return res.status(500).json({ ok: false, error: (e as Error).message });
+    }
+  });
+
+  // POST /api/admin/mail-queue/requeue - requeue a failed job by id
+  router.post("/mail-queue/requeue", async (req, res) => {
+    try {
+      if (process.env.NODE_ENV === "production") {
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+          return res.status(403).json({ error: "Interdit : jeton manquant" });
+        }
+        const token = authHeader.substring(7);
+        const verified = await AuthService.verifyToken(token);
+        if (!verified || verified.role !== "admin") {
+          return res.status(403).json({ error: "Interdit : jeton invalide" });
+        }
+      }
+      const { requeueJob } = await import("../services/mailQueue");
+      const { id } = req.body || {};
+      if (!id) return res.status(400).json({ ok: false, error: "id requis" });
+      const ok = requeueJob(id);
+      return res.json({ ok });
+    } catch (e) {
+      return res.status(500).json({ ok: false, error: (e as Error).message });
+    }
+  });
+
   return router;
 }

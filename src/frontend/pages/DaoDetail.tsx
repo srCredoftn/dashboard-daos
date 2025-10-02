@@ -47,6 +47,10 @@ export default function DaoDetail() {
 
   // État métier
   const [dao, setDao] = useState<Dao | null>(null);
+  // draft copy used for local edits; commit with single action
+  const [draftDao, setDraftDao] = useState<Dao | null>(null);
+  const [unsavedChanges, setUnsavedChanges] = useState(false);
+  const [isCommitting, setIsCommitting] = useState(false);
   const [isLastDao, setIsLastDao] = useState(false);
   const { toast } = useToast();
   const { refresh: refreshNotifications } = useNotifications();
@@ -91,6 +95,8 @@ export default function DaoDetail() {
         setError(null);
         const fetchedDao = await apiService.getDaoById(id);
         setDao(fetchedDao);
+        setDraftDao(JSON.parse(JSON.stringify(fetchedDao)));
+        setUnsavedChanges(false);
 
         // Déterminer s'il s'agit du dernier DAO créé (fonctionnalité admin)
         try {
@@ -182,8 +188,9 @@ export default function DaoDetail() {
     );
   }
 
-  // Calculs dérivés
-  const progress = calculateDaoProgress(dao.tasks);
+  // Calculs dérivés (basés sur la version brouillon si présente)
+  const activeDao = draftDao || dao;
+  const progress = activeDao ? calculateDaoProgress(activeDao.tasks) : 0;
 
   /**
    * Gestion des mises à jour de tâche (progress, commentaire, applicabilité, assignations)
@@ -194,128 +201,123 @@ export default function DaoDetail() {
     taskId: number,
     newProgress: number | null,
   ) => {
-    if (!dao) return;
+    if (!activeDao) return;
 
-    // MAJ optimiste
-    setDao((prev) =>
+    // MAJ locale sur le brouillon
+    setDraftDao((prev) => {
+      if (!prev) return prev;
+      const updated = {
+        ...prev,
+        tasks: prev.tasks.map((task) =>
+          task.id === taskId
+            ? {
+                ...task,
+                progress: newProgress ?? 0,
+                lastUpdatedAt: new Date().toISOString(),
+              }
+            : task,
+        ),
+      } as Dao;
+      setUnsavedChanges(true);
+      return updated;
+    });
+  };
+
+  const handleTaskCommentChange = (taskId: number, newComment: string) => {
+    setDraftDao((prev) =>
       prev
         ? {
             ...prev,
             tasks: prev.tasks.map((task) =>
               task.id === taskId
-                ? { ...task, progress: newProgress ?? 0 }
+                ? {
+                    ...task,
+                    comment: newComment,
+                    lastUpdatedAt: new Date().toISOString(),
+                  }
                 : task,
-            ),
-          }
-        : prev,
-    );
-
-    // Persistance + notifications
-    (async () => {
-      await handleTaskUpdate(taskId, {
-        progress: typeof newProgress === "number" ? newProgress : 0,
-      });
-      try {
-        await refreshNotifications();
-      } catch {}
-    })();
-  };
-
-  const handleTaskCommentChange = (taskId: number, newComment: string) => {
-    setDao((prev) =>
-      prev
-        ? {
-            ...prev,
-            tasks: prev.tasks.map((task) =>
-              task.id === taskId ? { ...task, comment: newComment } : task,
             ),
           }
         : null,
     );
+    setUnsavedChanges(true);
   };
 
   const handleTaskApplicableChange = (taskId: number, applicable: boolean) => {
-    if (!dao) return;
+    if (!activeDao) return;
 
     const updates = { isApplicable: applicable } as Partial<DaoTask>;
 
-    // MAJ optimiste
-    setDao((prev) => {
+    // MAJ locale sur le brouillon
+    setDraftDao((prev) => {
       if (!prev) return prev;
       return {
         ...prev,
         tasks: prev.tasks.map((task) =>
-          task.id === taskId ? { ...task, ...updates } : task,
+          task.id === taskId
+            ? { ...task, ...updates, lastUpdatedAt: new Date().toISOString() }
+            : task,
         ),
-      };
+      } as Dao;
     });
-
-    // Persistance ciblée
-    handleTaskUpdate(taskId, updates);
+    setUnsavedChanges(true);
   };
 
   const handleTeamUpdate = (newTeam: TeamMember[]) => {
-    setDao((prev) =>
-      prev
-        ? {
-            ...prev,
-            equipe: newTeam,
-          }
-        : null,
+    setDraftDao((prev) =>
+      prev ? ({ ...prev, equipe: newTeam } as Dao) : prev,
     );
-    // Sauvegarde différée (permet notifs/roles côté serveur)
-    if (dao) {
-      const nextDao = { ...dao, equipe: newTeam } as Dao;
-      debouncedSave(nextDao);
-    }
+    setUnsavedChanges(true);
   };
 
   // Mise à jour d'une tâche (nom ou autres propriétés)
   const handleTaskUpdate = async (
     taskId: number,
     updates: Partial<DaoTask>,
+    opts?: { immediate?: boolean },
   ) => {
-    if (!dao) return;
+    // By default, apply changes to the draft and mark as unsaved. If immediate=true, persist now.
+    if (!activeDao) return;
 
-    try {
-      // MAJ optimiste locale (timestamp)
-      setDao((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          tasks: prev.tasks.map((task) =>
-            task.id === taskId
-              ? { ...task, ...updates, lastUpdatedAt: new Date().toISOString() }
-              : task,
-          ),
-        };
-      });
+    // Apply to draft
+    setDraftDao((prev) => {
+      if (!prev) return prev;
+      const updated = {
+        ...prev,
+        tasks: prev.tasks.map((task) =>
+          task.id === taskId
+            ? { ...task, ...updates, lastUpdatedAt: new Date().toISOString() }
+            : task,
+        ),
+      } as Dao;
+      setUnsavedChanges(true);
+      return updated;
+    });
 
-      if (updates.name !== undefined) {
-        await taskService.updateTaskName(dao.id, taskId, updates.name);
-      } else {
-        await taskService.updateTask(dao.id, taskId, {
-          progress:
-            typeof updates.progress === "number" ? updates.progress : undefined,
-          comment: updates.comment,
-          isApplicable: updates.isApplicable,
-          assignedTo: updates.assignedTo,
-        });
-      }
-
+    if (opts?.immediate) {
+      // fallback to previous behaviour (persist single task)
       try {
-        await refreshNotifications();
-      } catch {}
-    } catch (error) {
-      devLog.error("Erreur lors de la mise à jour de la tâche:", error);
-      setError("Erreur lors de la mise à jour de la tâche");
-      try {
-        const freshDao = await apiService.getDaoById(dao.id);
-        setDao(freshDao);
-      } catch (reloadError) {
+        if (!dao) return;
+        if (updates.name !== undefined) {
+          await taskService.updateTaskName(dao.id, taskId, updates.name);
+        } else {
+          await taskService.updateTask(dao.id, taskId, {
+            progress:
+              typeof updates.progress === "number"
+                ? updates.progress
+                : undefined,
+            comment: updates.comment,
+            isApplicable: updates.isApplicable,
+            assignedTo: updates.assignedTo,
+          });
+        }
+        try {
+          await refreshNotifications();
+        } catch {}
+      } catch (error) {
         devLog.error(
-          "Erreur lors du rechargement du DAO après échec de mise à jour:",
-          reloadError,
+          "Erreur lors de la mise à jour immédiate de la tâche:",
+          error,
         );
       }
     }
@@ -325,37 +327,53 @@ export default function DaoDetail() {
     taskId: number,
     memberIds: string[],
   ) => {
-    if (!dao) return;
+    if (!activeDao) return;
 
-    // MAJ optimiste
-    setDao((prev) =>
+    // MAJ locale sur le brouillon
+    setDraftDao((prev) =>
       prev
-        ? {
+        ? ({
             ...prev,
             tasks: prev.tasks.map((t) =>
-              t.id === taskId ? { ...t, assignedTo: memberIds } : t,
+              t.id === taskId
+                ? {
+                    ...t,
+                    assignedTo: memberIds,
+                    lastUpdatedAt: new Date().toISOString(),
+                  }
+                : t,
             ),
-          }
+          } as Dao)
         : prev,
     );
+    setUnsavedChanges(true);
+  };
 
+  // Commit all draft changes in a single request
+  const handleCommitChanges = async () => {
+    if (!draftDao || !dao) return;
+    setIsCommitting(true);
     try {
-      await taskService.updateTask(dao.id, taskId, { assignedTo: memberIds });
+      const updated = await apiService.updateDao(dao.id, draftDao);
+      // update local states
+      setDao(updated);
+      setDraftDao(JSON.parse(JSON.stringify(updated)));
+      setUnsavedChanges(false);
       try {
         await refreshNotifications();
       } catch {}
-    } catch (error) {
-      devLog.error("Erreur lors de l'assignation de la tâche:", error);
-      setError("Échec de la mise à jour de l'assignation de la tâche");
-      try {
-        const fresh = await apiService.getDaoById(dao.id);
-        setDao(fresh);
-      } catch (reloadErr) {
-        devLog.error(
-          "Erreur lors du rechargement du DAO après l'échec d'assignation:",
-          reloadErr,
-        );
-      }
+      toast({
+        title: "Modifications enregistrées",
+        description: "Les changements ont été validés.",
+      });
+    } catch (e) {
+      devLog.error("Échec de la validation des changements:", e);
+      toast({
+        title: "Erreur",
+        description: "Impossible de valider les changements.",
+      });
+    } finally {
+      setIsCommitting(false);
     }
   };
 
@@ -363,7 +381,8 @@ export default function DaoDetail() {
   const handleExportWithOptions = (options: ExportOptions) => {
     if (!dao) return;
 
-    let filteredTasks = dao.tasks.filter((task) => {
+    let tasksSource = activeDao ? activeDao.tasks : [];
+    let filteredTasks = tasksSource.filter((task) => {
       if (!task.isApplicable && !options.includeNotApplicable) return false;
       if (task.isApplicable) {
         const progress = task.progress || 0;
@@ -381,7 +400,7 @@ export default function DaoDetail() {
       options.includeCompleted &&
       options.includeNotApplicable
     ) {
-      filteredTasks = dao.tasks;
+      filteredTasks = tasksSource;
     }
 
     if (options.format === "PDF") {
@@ -800,7 +819,7 @@ export default function DaoDetail() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${dao?.numeroListe}_tasks.csv`;
+    a.download = `${activeDao?.numeroListe || "export"}_tasks.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -932,7 +951,7 @@ export default function DaoDetail() {
                   {progress}% terminé
                 </Badge>
                 <ExportFilterDialog
-                  tasks={dao.tasks}
+                  tasks={activeDao?.tasks || []}
                   onExport={handleExportWithOptions}
                 >
                   <Button variant="outline" size="sm" className="px-3 h-8">
@@ -951,7 +970,7 @@ export default function DaoDetail() {
               <div className="min-w-0">
                 <h1 className="text-base font-bold truncate">Détails DAO</h1>
                 <p className="text-xs text-muted-foreground truncate">
-                  {dao.numeroListe} • {dao.reference}
+                  {activeDao?.numeroListe} • {activeDao?.reference}
                 </p>
               </div>
             </div>
@@ -972,7 +991,7 @@ export default function DaoDetail() {
                   {progress}% terminé
                 </Badge>
                 <ExportFilterDialog
-                  tasks={dao.tasks}
+                  tasks={activeDao?.tasks || []}
                   onExport={handleExportWithOptions}
                 >
                   <Button variant="outline" size="sm">
@@ -990,7 +1009,7 @@ export default function DaoDetail() {
               <div>
                 <h1 className="text-lg lg:text-xl font-bold">Détails DAO</h1>
                 <p className="text-sm text-muted-foreground">
-                  {dao.numeroListe} • {dao.reference}
+                  {activeDao?.numeroListe} • {activeDao?.reference}
                 </p>
               </div>
             </div>
@@ -1028,7 +1047,7 @@ export default function DaoDetail() {
                 ) : (
                   <div className="flex items-start gap-3">
                     <CardTitle className="text-lg md:text-xl">
-                      {dao.objetDossier}
+                      {activeDao?.objetDossier}
                     </CardTitle>
                     {isAdmin() && (
                       <Button
@@ -1086,7 +1105,9 @@ export default function DaoDetail() {
                     </div>
                   </div>
                 ) : (
-                  <p className="font-medium break-words">{dao.reference}</p>
+                  <p className="font-medium break-words">
+                    {activeDao?.reference}
+                  </p>
                 )}
               </div>
 
@@ -1098,7 +1119,10 @@ export default function DaoDetail() {
                   <span
                     className={cn(
                       "px-2 py-1 rounded text-sm font-medium blink-attention",
-                      getBlinkingDateClasses(progress, dao.dateDepot),
+                      getBlinkingDateClasses(
+                        progress,
+                        activeDao?.dateDepot || "",
+                      ),
                     )}
                   >
                     {dateInfo.date} ({dateInfo.daysDiffAbs}j{" "}
@@ -1145,7 +1169,9 @@ export default function DaoDetail() {
                     </div>
                   </div>
                 ) : (
-                  <p className="font-medium">{dao.autoriteContractante}</p>
+                  <p className="font-medium">
+                    {activeDao?.autoriteContractante}
+                  </p>
                 )}
               </div>
             </div>
@@ -1194,22 +1220,22 @@ export default function DaoDetail() {
                 <Label className="text-sm font-medium">Chef d'équipe</Label>
                 {isAdmin() && (
                   <TeamEditDialog
-                    currentTeam={dao.equipe}
+                    currentTeam={activeDao?.equipe || []}
                     onTeamUpdate={handleTeamUpdate}
                     type="both"
                   />
                 )}
               </div>
               <p className="font-medium break-words">
-                {dao.equipe.find((m) => m.role === "chef_equipe")?.name ||
-                  "Non assigné"}
+                {activeDao?.equipe.find((m) => m.role === "chef_equipe")
+                  ?.name || "Non assigné"}
               </p>
 
               <div className="flex items-center justify-between">
                 <Label className="text-sm font-medium">Membres d'équipe</Label>
               </div>
               <div className="space-y-2">
-                {dao.equipe
+                {(activeDao?.equipe || [])
                   .filter((m) => m.role === "membre_equipe")
                   .map((member) => (
                     <div
@@ -1233,19 +1259,19 @@ export default function DaoDetail() {
           </CardHeader>
           <CardContent className="px-3 sm:px-6">
             <div className="space-y-3 sm:space-y-4">
-              {dao.tasks.map((task, index) => {
+              {(activeDao?.tasks || []).map((task, index) => {
                 const displayIndex = index + 1;
                 return (
                   <TaskRow
                     key={task.id}
                     task={task}
-                    daoId={dao.id}
+                    daoId={activeDao?.id}
                     onProgressChange={handleTaskProgressChange}
                     onCommentChange={handleTaskCommentChange}
                     onApplicableChange={handleTaskApplicableChange}
                     onAssignmentChange={handleTaskAssignmentChange}
                     onTaskUpdate={handleTaskUpdate}
-                    availableMembers={dao.equipe}
+                    availableMembers={activeDao?.equipe || []}
                     daysDiff={dateInfo.daysDiff}
                     taskIndex={displayIndex}
                   />
@@ -1264,17 +1290,39 @@ export default function DaoDetail() {
                 </span>
               </div>
             </div>
+
+            {/* Bouton Valider pour DAOs non-dernier */}
+            {!isLastDao && isAdmin() && (
+              <div className="mt-6 flex justify-center">
+                <Button
+                  variant="default"
+                  size="default"
+                  disabled={!unsavedChanges || isCommitting}
+                  onClick={() => handleCommitChanges()}
+                >
+                  {isCommitting ? "Validation..." : "Valider les changements"}
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 
         {isAdmin() && isLastDao && (
-          <div className="mt-8 flex justify-center">
+          <div className="mt-8 flex justify-center items-center gap-4">
             <DeleteLastDaoButton
               hasDaos={true}
               onDeleted={() => {
                 navigate("/");
               }}
             />
+            <Button
+              variant="default"
+              size="default"
+              disabled={!unsavedChanges || isCommitting}
+              onClick={() => handleCommitChanges()}
+            >
+              {isCommitting ? "Validation..." : "Valider les changements"}
+            </Button>
           </div>
         )}
       </main>

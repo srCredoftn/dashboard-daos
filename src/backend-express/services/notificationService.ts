@@ -4,7 +4,7 @@ Domaine: Backend/Services
 Exports: NotificationType, ServerNotification, NotificationService
 Liens: appels /api, utils de fetch, types @shared/*
 */
-import { emailAllUsers, sendEmail } from "./txEmail";
+import {} from /* emailAllUsers, sendEmail removed - mail queue used instead */ "./txEmail";
 import { AuthService } from "./authService";
 import { logger } from "../utils/logger";
 import { MongoNotificationRepository } from "../repositories/mongoNotificationRepository";
@@ -132,26 +132,46 @@ class InMemoryNotificationService {
     // Corps : uniquement le message, pas de titre dupliqué, pas de section "Détails"
     const body = String(item.message || "");
 
-    // Helper retry
-    const retryAsync = async (fn: () => Promise<void>, attempts = 3) => {
-      let lastErr: any = null;
-      for (let i = 0; i < attempts; i++) {
-        try {
-          await fn();
-          return;
-        } catch (e) {
-          lastErr = e;
-          const wait = 200 * Math.pow(2, i);
-          await new Promise((r) => setTimeout(r, wait));
-        }
-      }
-      throw lastErr;
-    };
-
     try {
+      // Use mail queue for robust delivery
+      const { enqueueMail } = await import("./mailQueue");
+
       if (item.recipients === "all") {
-        await retryAsync(() => emailAllUsers(subject, body, undefined), 3);
-        logger.info("Miroir email (diffusion) envoyé avec succès", "MAIL", {
+        // Enqueue a broadcast: resolve emails server-side inside queue by using emailAllUsers via a small job split
+        const tpl = {
+          subject,
+          body,
+          type: undefined,
+        };
+        // fetch all emails now and enqueue as batches
+        const allEmails = await (async () => {
+          try {
+            return (await AuthService.getAllUsers())
+              .map((u) => u.email)
+              .filter(Boolean);
+          } catch {
+            return [] as string[];
+          }
+        })();
+        if (!allEmails || allEmails.length === 0) {
+          logger.info(
+            "Miroir email : aucun destinataire trouvé (skip)",
+            "MAIL",
+            { type: item.type },
+          );
+          return;
+        }
+        // Batch enqueue to avoid giant BCCs
+        const BATCH_SIZE = Math.max(
+          1,
+          Number(process.env.SMTP_BATCH_SIZE || 25),
+        );
+        for (let i = 0; i < allEmails.length; i += BATCH_SIZE) {
+          const batch = allEmails.slice(i, i + BATCH_SIZE);
+          await enqueueMail(batch, tpl.subject, tpl.body, item.type);
+        }
+
+        logger.info("Miroir email (diffusion) enqueued", "MAIL", {
           type: item.type,
         });
         return;
@@ -174,10 +194,9 @@ class InMemoryNotificationService {
         return;
       }
 
-      await retryAsync(() => sendEmail(emails, subject, body, undefined), 3);
-      logger.info("Miroir email envoyé avec succès", "MAIL", {
-        type: item.type,
-      });
+      // Enqueue as a single job (mailQueue will batch if needed)
+      await enqueueMail(emails, subject, body, item.type);
+      logger.info("Miroir email enqueued", "MAIL", { type: item.type });
     } catch (e) {
       const err: any = e;
       const code = err?.responseCode || err?.code || "unknown";
@@ -243,7 +262,19 @@ class InMemoryNotificationService {
     message: string,
     data?: Record<string, any>,
   ) {
-    return this.add({ type, title, message, data, recipients: "all" });
+    // Par défaut, éviter le mirroring email pour les broadcasts automatiques
+    // Si on veut explicitement envoyer des emails pour un broadcast, passer { skipEmailMirror: false }
+    const safeData = Object.assign({}, data || {}, {
+      skipEmailMirror:
+        (data && (data as any).skipEmailMirror) === false ? false : true,
+    });
+    return this.add({
+      type,
+      title,
+      message,
+      data: safeData,
+      recipients: "all",
+    });
   }
 
   /**

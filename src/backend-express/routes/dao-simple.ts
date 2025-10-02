@@ -18,7 +18,7 @@ import {
 } from "../middleware/auth";
 import { devLog } from "../utils/devLog";
 import { DEFAULT_TASKS } from "@shared/dao";
-import type { Dao } from "@shared/dao";
+import type { Dao, TeamMember } from "@shared/dao";
 import { DaoService } from "../services/daoService";
 import { logger } from "../utils/logger";
 import { NotificationService } from "../services/notificationService";
@@ -297,7 +297,12 @@ router.post(
       // Notifier la plateforme et envoyer un e-mail à tous les utilisateurs
       try {
         const t = tplDaoCreated(newDao);
-        NotificationService.broadcast(t.type, t.title, t.message, t.data);
+        NotificationService.broadcast(
+          t.type,
+          t.title,
+          t.message,
+          Object.assign({}, t.data || {}, { skipEmailMirror: false }),
+        );
       } catch (_) {}
 
       res.status(201).json(newDao);
@@ -424,7 +429,7 @@ router.put(
           .json({ error: "DAO introuvable", code: "DAO_NOT_FOUND" });
       }
 
-      // Notify on team role/member changes
+      // Notify on team role/member changes and detect task changes
       try {
         let hasTaskChanges = false;
 
@@ -451,14 +456,16 @@ router.put(
               "role_update",
               "Modification de l'équipe",
               changed.join(", "),
-              { daoId: updated.id, changes: changed },
+              Object.assign(
+                {},
+                { daoId: updated.id, changes: changed },
+                { skipEmailMirror: false },
+              ),
             );
-
-            // Email affected members when emails exist (handled elsewhere if needed)
           }
         }
 
-        // Si les tâches ont changé via ce endpoint, ne FLAGGER que les changements (pas de broadcast ici)
+        // If tasks were provided in the update, compute per-task differences and flag changes
         if (before && Array.isArray(validatedData.tasks)) {
           const byIdBefore = new Map(before.tasks.map((t) => [t.id, t]));
           const sameArray = (a?: string[], b?: string[]) => {
@@ -469,6 +476,9 @@ router.put(
               if (aa[i] !== bb[i]) return false;
             return true;
           };
+
+          const changedTasks: { prev: any; curr: any }[] = [];
+
           for (const t of updated.tasks) {
             const prev = byIdBefore.get(t.id);
             if (!prev) continue;
@@ -480,20 +490,65 @@ router.put(
               prev.comment !== t.comment ||
               !sameArray(prev.assignedTo, t.assignedTo)
             ) {
-              hasTaskChanges = true; // will trigger a generic DAO update notice later
+              hasTaskChanges = true;
+              changedTasks.push({ prev, curr: t });
             }
+          }
+
+          // For each changed task, broadcast an individual task notification
+          for (const ch of changedTasks) {
+            try {
+              const prev = ch.prev;
+              const curr = ch.curr;
+
+              const prevSet = new Set(prev.assignedTo || []);
+              const currSet = new Set(curr.assignedTo || []);
+              const added: string[] = [];
+              const removed: string[] = [];
+              for (const id of currSet) if (!prevSet.has(id)) added.push(id);
+              for (const id of prevSet) if (!currSet.has(id)) removed.push(id);
+
+              let changeType:
+                | "progress"
+                | "applicability"
+                | "assignees"
+                | "comment"
+                | "general" = "general";
+              if ((prev.progress ?? 0) !== (curr.progress ?? 0))
+                changeType = "progress";
+              else if (prev.isApplicable !== curr.isApplicable)
+                changeType = "applicability";
+              else if (added.length || removed.length) changeType = "assignees";
+              else if (prev.comment !== curr.comment) changeType = "comment";
+
+              const notif = tplTaskNotification({
+                dao: updated,
+                previous: prev,
+                current: curr,
+                changeType,
+                added,
+                removed,
+                comment:
+                  prev.comment !== curr.comment ? curr.comment : undefined,
+              });
+
+              NotificationService.broadcast(
+                notif.type,
+                notif.title,
+                notif.message,
+                Object.assign({}, notif.data || {}, { skipEmailMirror: false }),
+              );
+            } catch (_) {}
           }
         }
 
-        // Mark on res.locals to inform later step whether to broadcast generic update
+        // Mark on res.locals to inform later step whether tasks changed
         (res as any).hasTaskChanges =
           (res as any).hasTaskChanges || hasTaskChanges;
       } catch (_) {}
 
       // Always broadcast a general DAO update and email all users
       try {
-        const hasTaskChanges = (res as any).hasTaskChanges === true;
-
         const changedKeys = new Set<string>();
         if (before && updated) {
           if (before.numeroListe !== updated.numeroListe)
@@ -512,10 +567,14 @@ router.put(
           }
         }
 
-        if (changedKeys.size > 0 || !hasTaskChanges) {
-          const t = tplDaoUpdated(updated, changedKeys);
-          NotificationService.broadcast(t.type, t.title, t.message, t.data);
-        }
+        // Always send DAO updated notification
+        const t = tplDaoUpdated(updated, changedKeys);
+        NotificationService.broadcast(
+          t.type,
+          t.title,
+          t.message,
+          Object.assign({}, t.data || {}, { skipEmailMirror: false }),
+        );
       } catch (_) {}
 
       logger.audit("DAO mis à jour avec succès", req.user?.id, req.ip);
@@ -661,7 +720,12 @@ router.delete(
 
       try {
         const t = tplDaoDeleted(last);
-        NotificationService.broadcast(t.type, t.title, t.message, t.data);
+        NotificationService.broadcast(
+          t.type,
+          t.title,
+          t.message,
+          Object.assign({}, t.data || {}, { skipEmailMirror: false }),
+        );
       } catch (_) {}
 
       logger.audit("Dernier DAO supprimé avec succès", req.user?.id, req.ip);
@@ -683,7 +747,7 @@ router.delete(
 
 /**
  * PUT /api/dao/:id/tasks/reorder
- * Réordonne les tâches d'un DAO selon un tableau d'IDs complet.
+ * Réordonne les t��ches d'un DAO selon un tableau d'IDs complet.
  * Règles: doit contenir tous les IDs existants, ordre libre.
  */
 router.put(
@@ -923,6 +987,100 @@ router.put(
         error: "Échec de mise à jour de la tâche",
         code: "TASK_UPDATE_ERROR",
       });
+    }
+  },
+);
+
+// POST /api/dao/:id/promote-member
+// Promote a team member to chef_equipe for a DAO (persist then broadcast).
+// Security: admin required. Does NOT change global user role; use /api/auth/users/:id/role for that (super-admin guarded).
+router.post(
+  "/:id/promote-member",
+  authenticate,
+  requireAdmin,
+  auditLog("PROMOTE_MEMBER"),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { memberId } = req.body || {};
+
+      if (!id) {
+        return res
+          .status(400)
+          .json({ error: "ID du DAO manquant", code: "MISSING_DAO_ID" });
+      }
+      if (!memberId || typeof memberId !== "string") {
+        return res
+          .status(400)
+          .json({ error: "memberId requis", code: "MISSING_MEMBER_ID" });
+      }
+
+      const dao = await DaoService.getDaoById(id);
+      if (!dao) {
+        return res
+          .status(404)
+          .json({ error: "DAO introuvable", code: "DAO_NOT_FOUND" });
+      }
+
+      const member = dao.equipe.find((m) => m.id === memberId);
+      if (!member) {
+        return res
+          .status(404)
+          .json({
+            error: "Membre introuvable dans l'équipe",
+            code: "MEMBER_NOT_FOUND",
+          });
+      }
+
+      // Determine previous leader (if any)
+      const prevLeader = dao.equipe.find((m) => m.role === "chef_equipe");
+
+      // Build new team roles: promote target, demote previous leader if different
+      const newEquipe: TeamMember[] = dao.equipe.map((m) => {
+        if (m.id === memberId)
+          return { ...m, role: "chef_equipe" as const } as TeamMember;
+        if (prevLeader && m.id === prevLeader.id && prevLeader.id !== memberId)
+          return { ...m, role: "membre_equipe" as const } as TeamMember;
+        return m as TeamMember;
+      });
+
+      // Persist change server-side (ensure persisted before broadcasting)
+      const updated = await DaoService.updateDao(id, { equipe: newEquipe });
+      if (!updated) {
+        return res
+          .status(500)
+          .json({
+            error: "Échec de mise à jour de l'équipe",
+            code: "UPDATE_FAILED",
+          });
+      }
+
+      // Prepare change message
+      const changes: string[] = [];
+      if (prevLeader && prevLeader.id !== memberId) {
+        changes.push(
+          `${member.name} promu chef d'équipe (remplace ${prevLeader.name})`,
+        );
+      } else {
+        changes.push(`${member.name} promu chef d'équipe`);
+      }
+
+      // Broadcast a role_update notification after persistence.
+      try {
+        NotificationService.broadcast(
+          "role_update",
+          "Modification de l'équipe",
+          changes.join(", "),
+          Object.assign({}, { daoId: updated.id }, { skipEmailMirror: false }),
+        );
+      } catch (_) {}
+
+      return res.json(updated);
+    } catch (error) {
+      logger.error("Erreur lors de la promotion du membre", "PROMOTE_MEMBER", {
+        message: (error as Error)?.message,
+      });
+      return res.status(500).json({ error: "Échec de la promotion du membre" });
     }
   },
 );
