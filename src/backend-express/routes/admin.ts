@@ -324,7 +324,7 @@ export default function createAdminRoutes(setBootId: (id: string) => string) {
           return res.status(403).json({ error: "Interdit : jeton invalide" });
         }
       }
-      const { getQueue, requeueJob } = await import("../services/mailQueue");
+      const { getQueue } = await import("../services/mailQueue");
       const q = getQueue();
       return res.json({ ok: true, queue: q });
     } catch (e) {
