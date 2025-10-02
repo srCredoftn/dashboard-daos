@@ -176,6 +176,13 @@ export async function processQueue() {
         try {
           await sendEmail(job.to, job.subject, job.body, job.type as any);
           // remove or mark processed
+          // Save into logs for history before removing
+          try {
+            const LogModel = mongoose.models.MailJobLog || mongoose.model("MailJobLog", new mongoose.Schema({ id: String, to: [String], subject: String, body: String, type: String, attempts: Number, lastError: String, createdAt: String, processedAt: String, status: String }));
+            await LogModel.create({ id: job.id, to: job.to, subject: job.subject, body: job.body, type: job.type, attempts: job.attempts || 0, lastError: job.lastError || null, createdAt: job.createdAt, processedAt: new Date().toISOString(), status: "sent" });
+          } catch (e) {
+            logger.warn("Failed to write mail job log (mongo)", "MAIL_QUEUE", { message: String((e as Error)?.message) });
+          }
           await M.deleteOne({ id: job.id }).exec();
           logger.info(`Mail job sent (mongo): ${job.id}`, "MAIL_QUEUE", { toCount: (job.to || []).length });
         } catch (e) {
