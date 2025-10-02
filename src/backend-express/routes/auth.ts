@@ -114,15 +114,16 @@ router.post("/login", async (req, res) => {
     try {
       const t = tplLoginSuccess({ userName: authResponse.user.name });
       NotificationService.add({
-        ...t,
-        recipients: [authResponse.user.id],
-      });
-      NotificationService.broadcast(
-        t.type,
-        t.title,
-        `Utilisateur : ${authResponse.user.name}\nDate : ${new Date().toLocaleString("fr-FR")}`,
-        { email: authResponse.user.email },
-      );
+      ...t,
+      recipients: [authResponse.user.id],
+    });
+    // Broadcast UI notification but skip email mirroring to avoid triggering SMTP rate limits
+    NotificationService.broadcast(
+      t.type,
+      t.title,
+      `Utilisateur : ${authResponse.user.name}\nDate : ${new Date().toLocaleString("fr-FR")}`,
+      { email: authResponse.user.email, skipEmailMirror: true },
+    );
     } catch (_) {}
 
     return res.json(authResponse);
