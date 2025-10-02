@@ -201,31 +201,20 @@ export default function DaoDetail() {
     taskId: number,
     newProgress: number | null,
   ) => {
-    if (!dao) return;
+    if (!activeDao) return;
 
-    // MAJ optimiste
-    setDao((prev) =>
-      prev
-        ? {
-            ...prev,
-            tasks: prev.tasks.map((task) =>
-              task.id === taskId
-                ? { ...task, progress: newProgress ?? 0 }
-                : task,
-            ),
-          }
-        : prev,
-    );
-
-    // Persistance + notifications
-    (async () => {
-      await handleTaskUpdate(taskId, {
-        progress: typeof newProgress === "number" ? newProgress : 0,
-      });
-      try {
-        await refreshNotifications();
-      } catch {}
-    })();
+    // MAJ locale sur le brouillon
+    setDraftDao((prev) => {
+      if (!prev) return prev;
+      const updated = {
+        ...prev,
+        tasks: prev.tasks.map((task) =>
+          task.id === taskId ? { ...task, progress: newProgress ?? 0, lastUpdatedAt: new Date().toISOString() } : task,
+        ),
+      } as Dao;
+      setUnsavedChanges(true);
+      return updated;
+    });
   };
 
   const handleTaskCommentChange = (taskId: number, newComment: string) => {
