@@ -1200,13 +1200,13 @@ export default function DaoDetail() {
                   <TaskRow
                     key={task.id}
                     task={task}
-                    daoId={dao.id}
+                    daoId={activeDao?.id}
                     onProgressChange={handleTaskProgressChange}
                     onCommentChange={handleTaskCommentChange}
                     onApplicableChange={handleTaskApplicableChange}
                     onAssignmentChange={handleTaskAssignmentChange}
                     onTaskUpdate={handleTaskUpdate}
-                    availableMembers={dao.equipe}
+                    availableMembers={activeDao?.equipe || []}
                     daysDiff={dateInfo.daysDiff}
                     taskIndex={displayIndex}
                   />
