@@ -1194,7 +1194,7 @@ export default function DaoDetail() {
           </CardHeader>
           <CardContent className="px-3 sm:px-6">
             <div className="space-y-3 sm:space-y-4">
-              {dao.tasks.map((task, index) => {
+              {(activeDao?.tasks || []).map((task, index) => {
                 const displayIndex = index + 1;
                 return (
                   <TaskRow
