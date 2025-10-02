@@ -1,6 +1,9 @@
 import fs from "fs";
 import path from "path";
-import { v4 as uuidv4 } from "uuid";
+// lightweight id generator (no external deps)
+function genId() {
+  return `mj_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,9)}`;
+}
 import { sendEmail } from "./txEmail";
 import { logger } from "../utils/logger";
 
