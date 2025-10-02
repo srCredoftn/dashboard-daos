@@ -149,35 +149,54 @@ class InMemoryNotificationService {
     };
 
     try {
+      // Use mail queue for robust delivery
+      const { enqueueMail } = await import("./mailQueue");
+
       if (item.recipients === "all") {
-        await retryAsync(() => emailAllUsers(subject, body, undefined), 3);
-        logger.info("Miroir email (diffusion) envoyé avec succès", "MAIL", {
-          type: item.type,
-        });
+        // Enqueue a broadcast: resolve emails server-side inside queue by using emailAllUsers via a small job split
+        const tpl = {
+          subject,
+          body,
+          type: undefined,
+        };
+        // fetch all emails now and enqueue as batches
+        const allEmails = await (async () => {
+          try {
+            return (await AuthService.getAllUsers()).map((u) => u.email).filter(Boolean);
+          } catch {
+            return [] as string[];
+          }
+        })();
+        if (!allEmails || allEmails.length === 0) {
+          logger.info("Miroir email : aucun destinataire trouvé (skip)", "MAIL", { type: item.type });
+          return;
+        }
+        // Batch enqueue to avoid giant BCCs
+        const BATCH_SIZE = Math.max(1, Number(process.env.SMTP_BATCH_SIZE || 25));
+        for (let i = 0; i < allEmails.length; i += BATCH_SIZE) {
+          const batch = allEmails.slice(i, i + BATCH_SIZE);
+          await enqueueMail(batch, tpl.subject, tpl.body, item.type);
+        }
+
+        logger.info("Miroir email (diffusion) enqueued", "MAIL", { type: item.type });
         return;
       }
 
       // Map recipient user ids to emails
       const users = await AuthService.getAllUsers();
       const emails = users
-        .filter(
-          (u) =>
-            Array.isArray(item.recipients) && item.recipients.includes(u.id),
-        )
+        .filter((u) => Array.isArray(item.recipients) && item.recipients.includes(u.id))
         .map((u) => u.email)
         .filter(Boolean);
 
       if (emails.length === 0) {
-        logger.info("Miroir email : aucun destinataire trouvé (skip)", "MAIL", {
-          type: item.type,
-        });
+        logger.info("Miroir email : aucun destinataire trouvé (skip)", "MAIL", { type: item.type });
         return;
       }
 
-      await retryAsync(() => sendEmail(emails, subject, body, undefined), 3);
-      logger.info("Miroir email envoyé avec succès", "MAIL", {
-        type: item.type,
-      });
+      // Enqueue as a single job (mailQueue will batch if needed)
+      await enqueueMail(emails, subject, body, item.type);
+      logger.info("Miroir email enqueued", "MAIL", { type: item.type });
     } catch (e) {
       const err: any = e;
       const code = err?.responseCode || err?.code || "unknown";
