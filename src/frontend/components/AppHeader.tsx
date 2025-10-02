@@ -191,6 +191,10 @@ export function AppHeader({ title, children }: AppHeaderProps) {
                             <Settings className="mr-2 h-4 w-4" />
                             Gestion des rôles
                           </DropdownMenuItem>
+                          <DropdownMenuItem onClick={handleMailManagementClick}>
+                            <Users className="mr-2 h-4 w-4" />
+                            Gestion des mails
+                          </DropdownMenuItem>
                         </>
                       )}
 
@@ -356,6 +360,20 @@ export function AppHeader({ title, children }: AppHeaderProps) {
                       </div>
                       <span className="font-medium text-gray-700">
                         Gestion des rôles
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        handleMailManagementClick();
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className="w-full flex items-center space-x-4 p-4 text-left hover:bg-gray-100 rounded-xl transition-colors group"
+                    >
+                      <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center group-hover:bg-yellow-200 transition-colors">
+                        <Users className="w-5 h-5 text-yellow-600" />
+                      </div>
+                      <span className="font-medium text-gray-700">
+                        Gestion des mails
                       </span>
                     </button>
                   </>
