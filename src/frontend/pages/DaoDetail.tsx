@@ -323,7 +323,8 @@ export default function DaoDetail() {
   const handleExportWithOptions = (options: ExportOptions) => {
     if (!dao) return;
 
-    let filteredTasks = dao.tasks.filter((task) => {
+    let tasksSource = activeDao ? activeDao.tasks : [];
+    let filteredTasks = tasksSource.filter((task) => {
       if (!task.isApplicable && !options.includeNotApplicable) return false;
       if (task.isApplicable) {
         const progress = task.progress || 0;
@@ -341,7 +342,7 @@ export default function DaoDetail() {
       options.includeCompleted &&
       options.includeNotApplicable
     ) {
-      filteredTasks = dao.tasks;
+      filteredTasks = tasksSource;
     }
 
     if (options.format === "PDF") {
