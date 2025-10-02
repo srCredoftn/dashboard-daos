@@ -55,6 +55,10 @@ export function AppHeader({ title, children }: AppHeaderProps) {
     navigate("/admin/users");
   };
 
+  const handleMailManagementClick = () => {
+    navigate("/admin/mails");
+  };
+
   const handleUserManagementClick = () => {
     navigate("/user-management");
   };
