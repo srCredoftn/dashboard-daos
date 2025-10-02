@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 /**
  * Détail d'un DAO
- * R��le: afficher et éditer les informations d'un DAO, ses tâches, l'équipe et exporter des rapports (PDF/CSV).
+ * Rôle: afficher et éditer les informations d'un DAO, ses tâches, l'équipe et exporter des rapports (PDF/CSV).
  * Perf: mises à jour optimistes, debounce des sauvegardes, import dynamique de jsPDF.
  */
 import { useParams, Link, useNavigate } from "react-router-dom";
@@ -309,38 +309,20 @@ export default function DaoDetail() {
     taskId: number,
     memberIds: string[],
   ) => {
-    if (!dao) return;
+    if (!activeDao) return;
 
-    // MAJ optimiste
-    setDao((prev) =>
+    // MAJ locale sur le brouillon
+    setDraftDao((prev) =>
       prev
-        ? {
+        ? ({
             ...prev,
             tasks: prev.tasks.map((t) =>
-              t.id === taskId ? { ...t, assignedTo: memberIds } : t,
+              t.id === taskId ? { ...t, assignedTo: memberIds, lastUpdatedAt: new Date().toISOString() } : t,
             ),
-          }
+          } as Dao)
         : prev,
     );
-
-    try {
-      await taskService.updateTask(dao.id, taskId, { assignedTo: memberIds });
-      try {
-        await refreshNotifications();
-      } catch {}
-    } catch (error) {
-      devLog.error("Erreur lors de l'assignation de la tâche:", error);
-      setError("Échec de la mise à jour de l'assignation de la tâche");
-      try {
-        const fresh = await apiService.getDaoById(dao.id);
-        setDao(fresh);
-      } catch (reloadErr) {
-        devLog.error(
-          "Erreur lors du rechargement du DAO après l'échec d'assignation:",
-          reloadErr,
-        );
-      }
-    }
+    setUnsavedChanges(true);
   };
 
   // Export avec options (filtrage des tâches)
