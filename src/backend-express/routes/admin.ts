@@ -310,5 +310,51 @@ export default function createAdminRoutes(setBootId: (id: string) => string) {
     }
   });
 
+  // GET /api/admin/mail-queue - list queued mail jobs
+  router.get("/mail-queue", async (req, res) => {
+    try {
+      if (process.env.NODE_ENV === "production") {
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+          return res.status(403).json({ error: "Interdit : jeton manquant" });
+        }
+        const token = authHeader.substring(7);
+        const verified = await AuthService.verifyToken(token);
+        if (!verified || verified.role !== "admin") {
+          return res.status(403).json({ error: "Interdit : jeton invalide" });
+        }
+      }
+      const { getQueue, requeueJob } = await import("../services/mailQueue");
+      const q = getQueue();
+      return res.json({ ok: true, queue: q });
+    } catch (e) {
+      return res.status(500).json({ ok: false, error: (e as Error).message });
+    }
+  });
+
+  // POST /api/admin/mail-queue/requeue - requeue a failed job by id
+  router.post("/mail-queue/requeue", async (req, res) => {
+    try {
+      if (process.env.NODE_ENV === "production") {
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+          return res.status(403).json({ error: "Interdit : jeton manquant" });
+        }
+        const token = authHeader.substring(7);
+        const verified = await AuthService.verifyToken(token);
+        if (!verified || verified.role !== "admin") {
+          return res.status(403).json({ error: "Interdit : jeton invalide" });
+        }
+      }
+      const { requeueJob } = await import("../services/mailQueue");
+      const { id } = req.body || {};
+      if (!id) return res.status(400).json({ ok: false, error: "id requis" });
+      const ok = requeueJob(id);
+      return res.json({ ok });
+    } catch (e) {
+      return res.status(500).json({ ok: false, error: (e as Error).message });
+    }
+  });
+
   return router;
 }
