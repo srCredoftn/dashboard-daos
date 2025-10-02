@@ -55,7 +55,7 @@ export async function enqueueMail(to: string | string[], subject: string, body: 
   const recipients = Array.isArray(to) ? to.filter(Boolean) : [String(to)];
   if (recipients.length === 0) return null;
   const job: MailJob = {
-    id: uuidv4(),
+    id: genId(),
     to: recipients,
     subject,
     body,
