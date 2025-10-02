@@ -18,7 +18,7 @@ import {
 } from "../middleware/auth";
 import { devLog } from "../utils/devLog";
 import { DEFAULT_TASKS } from "@shared/dao";
-import type { Dao } from "@shared/dao";
+import type { Dao, TeamMember } from "@shared/dao";
 import { DaoService } from "../services/daoService";
 import { logger } from "../utils/logger";
 import { NotificationService } from "../services/notificationService";
