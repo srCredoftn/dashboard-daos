@@ -233,11 +233,39 @@ export async function processQueue() {
 
     // File-based processing (existing behaviour)
     let queue = readQueueFile();
+    const LOG_FILE = path.join(DATA_DIR, "mail-queue-log.json");
+    function readLogFile(): any[] {
+      try {
+        if (!fs.existsSync(LOG_FILE)) return [];
+        const raw = fs.readFileSync(LOG_FILE, "utf8");
+        if (!raw) return [];
+        const q = JSON.parse(raw) as any[];
+        return Array.isArray(q) ? q : [];
+      } catch (e) {
+        logger.warn("Failed to read mail queue log file", "MAIL_QUEUE", { message: String((e as Error)?.message) });
+        return [];
+      }
+    }
+    function appendLogFile(entry: any) {
+      try {
+        const logs = readLogFile();
+        logs.unshift(entry);
+        fs.writeFileSync(LOG_FILE, JSON.stringify(logs, null, 2), "utf8");
+      } catch (e) {
+        logger.warn("Failed to append mail queue log file", "MAIL_QUEUE", { message: String((e as Error)?.message) });
+      }
+    }
     for (let i = 0; i < queue.length; i++) {
       const job = queue[i];
       if (job.nextAttemptAt > now) continue;
       try {
         await sendEmail(job.to, job.subject, job.body, job.type as any);
+        // append success to log
+        try {
+          appendLogFile({ id: job.id, to: job.to, subject: job.subject, body: job.body, type: job.type, attempts: job.attempts || 0, lastError: job.lastError || null, createdAt: job.createdAt, processedAt: new Date().toISOString(), status: "sent" });
+        } catch (e) {
+          logger.warn("Failed to write mail log (file)", "MAIL_QUEUE", { message: String((e as Error)?.message) });
+        }
         queue = queue.filter((j) => j.id !== job.id);
         writeQueueFile(queue);
         logger.info(`Mail job sent: ${job.id}`, "MAIL_QUEUE", { toCount: job.to.length });
@@ -251,6 +279,11 @@ export async function processQueue() {
         writeQueueFile(queue);
         logger.error("Mail job failed", "MAIL_QUEUE", { id: job.id, attempts: job.attempts, error: errMsg });
         if (job.attempts >= DEFAULT_MAX_ATTEMPTS) {
+          try {
+            appendLogFile({ id: job.id, to: job.to, subject: job.subject, body: job.body, type: job.type, attempts: job.attempts, lastError: job.lastError, createdAt: job.createdAt, processedAt: new Date().toISOString(), status: "failed" });
+          } catch (e) {
+            logger.warn("Failed to write mail failure log (file)", "MAIL_QUEUE", { message: String((e as Error)?.message) });
+          }
           try {
             const { NotificationService } = await import("./notificationService");
             await NotificationService.add({
