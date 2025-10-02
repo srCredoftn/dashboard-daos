@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 /**
  * Détail d'un DAO
- * Rôle: afficher et éditer les informations d'un DAO, ses tâches, l'équipe et exporter des rapports (PDF/CSV).
+ * R��le: afficher et éditer les informations d'un DAO, ses tâches, l'équipe et exporter des rapports (PDF/CSV).
  * Perf: mises à jour optimistes, debounce des sauvegardes, import dynamique de jsPDF.
  */
 import { useParams, Link, useNavigate } from "react-router-dom";
@@ -250,19 +250,8 @@ export default function DaoDetail() {
   };
 
   const handleTeamUpdate = (newTeam: TeamMember[]) => {
-    setDao((prev) =>
-      prev
-        ? {
-            ...prev,
-            equipe: newTeam,
-          }
-        : null,
-    );
-    // Sauvegarde différée (permet notifs/roles côté serveur)
-    if (dao) {
-      const nextDao = { ...dao, equipe: newTeam } as Dao;
-      debouncedSave(nextDao);
-    }
+    setDraftDao((prev) => (prev ? { ...prev, equipe: newTeam } as Dao : prev));
+    setUnsavedChanges(true);
   };
 
   // Mise à jour d'une tâche (nom ou autres propriétés)
