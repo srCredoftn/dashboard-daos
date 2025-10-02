@@ -783,7 +783,7 @@ export default function DaoDetail() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${dao?.numeroListe}_tasks.csv`;
+    a.download = `${activeDao?.numeroListe || "export"}_tasks.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
