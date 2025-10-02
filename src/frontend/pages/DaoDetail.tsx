@@ -47,6 +47,10 @@ export default function DaoDetail() {
 
   // État métier
   const [dao, setDao] = useState<Dao | null>(null);
+  // draft copy used for local edits; commit with single action
+  const [draftDao, setDraftDao] = useState<Dao | null>(null);
+  const [unsavedChanges, setUnsavedChanges] = useState(false);
+  const [isCommitting, setIsCommitting] = useState(false);
   const [isLastDao, setIsLastDao] = useState(false);
   const { toast } = useToast();
   const { refresh: refreshNotifications } = useNotifications();
@@ -676,7 +680,7 @@ export default function DaoDetail() {
                 (id) => dao?.equipe.find((m) => m.id === id)?.name || "Inconnu",
               )
               .join(", ")
-          : "Non assigné";
+          : "Non assign��";
       const row = [task.name, applicableText, progressText, assignee];
 
       const wrapped = row.map((cell, i) =>
