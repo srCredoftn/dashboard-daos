@@ -132,22 +132,6 @@ class InMemoryNotificationService {
     // Corps : uniquement le message, pas de titre dupliqué, pas de section "Détails"
     const body = String(item.message || "");
 
-    // Helper retry
-    const retryAsync = async (fn: () => Promise<void>, attempts = 3) => {
-      let lastErr: any = null;
-      for (let i = 0; i < attempts; i++) {
-        try {
-          await fn();
-          return;
-        } catch (e) {
-          lastErr = e;
-          const wait = 200 * Math.pow(2, i);
-          await new Promise((r) => setTimeout(r, wait));
-        }
-      }
-      throw lastErr;
-    };
-
     try {
       // Use mail queue for robust delivery
       const { enqueueMail } = await import("./mailQueue");
