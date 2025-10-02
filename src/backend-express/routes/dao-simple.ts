@@ -683,7 +683,7 @@ router.delete(
 
 /**
  * PUT /api/dao/:id/tasks/reorder
- * Réordonne les tâches d'un DAO selon un tableau d'IDs complet.
+ * Réordonne les t��ches d'un DAO selon un tableau d'IDs complet.
  * Règles: doit contenir tous les IDs existants, ordre libre.
  */
 router.put(
@@ -923,6 +923,74 @@ router.put(
         error: "Échec de mise à jour de la tâche",
         code: "TASK_UPDATE_ERROR",
       });
+    }
+  },
+);
+
+// POST /api/dao/:id/promote-member
+// Promote a team member to chef_equipe for a DAO (persist then broadcast).
+// Security: admin required. Does NOT change global user role; use /api/auth/users/:id/role for that (super-admin guarded).
+router.post(
+  "/:id/promote-member",
+  authenticate,
+  requireAdmin,
+  auditLog("PROMOTE_MEMBER"),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { memberId } = req.body || {};
+
+      if (!id) {
+        return res.status(400).json({ error: "ID du DAO manquant", code: "MISSING_DAO_ID" });
+      }
+      if (!memberId || typeof memberId !== "string") {
+        return res.status(400).json({ error: "memberId requis", code: "MISSING_MEMBER_ID" });
+      }
+
+      const dao = await DaoService.getDaoById(id);
+      if (!dao) {
+        return res.status(404).json({ error: "DAO introuvable", code: "DAO_NOT_FOUND" });
+      }
+
+      const member = dao.equipe.find((m) => m.id === memberId);
+      if (!member) {
+        return res.status(404).json({ error: "Membre introuvable dans l'équipe", code: "MEMBER_NOT_FOUND" });
+      }
+
+      // Determine previous leader (if any)
+      const prevLeader = dao.equipe.find((m) => m.role === "chef_equipe");
+
+      // Build new team roles: promote target, demote previous leader if different
+      const newEquipe = dao.equipe.map((m) => {
+        if (m.id === memberId) return { ...m, role: "chef_equipe" };
+        if (prevLeader && m.id === prevLeader.id && prevLeader.id !== memberId)
+          return { ...m, role: "membre_equipe" };
+        return m;
+      });
+
+      // Persist change server-side (ensure persisted before broadcasting)
+      const updated = await DaoService.updateDao(id, { equipe: newEquipe });
+      if (!updated) {
+        return res.status(500).json({ error: "Échec de mise à jour de l'équipe", code: "UPDATE_FAILED" });
+      }
+
+      // Prepare change message
+      const changes: string[] = [];
+      if (prevLeader && prevLeader.id !== memberId) {
+        changes.push(`${member.name} promu chef d'équipe (remplace ${prevLeader.name})`);
+      } else {
+        changes.push(`${member.name} promu chef d'équipe`);
+      }
+
+      // Broadcast a role_update notification after persistence.
+      try {
+        NotificationService.broadcast("role_update", "Modification de l'équipe", changes.join(", "), { daoId: updated.id });
+      } catch (_) {}
+
+      return res.json(updated);
+    } catch (error) {
+      logger.error("Erreur lors de la promotion du membre", "PROMOTE_MEMBER", { message: (error as Error)?.message });
+      return res.status(500).json({ error: "Échec de la promotion du membre" });
     }
   },
 );
