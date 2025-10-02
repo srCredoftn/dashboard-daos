@@ -188,8 +188,9 @@ export default function DaoDetail() {
     );
   }
 
-  // Calculs dérivés
-  const progress = calculateDaoProgress(dao.tasks);
+  // Calculs dérivés (basés sur la version brouillon si présente)
+  const activeDao = draftDao || dao;
+  const progress = activeDao ? calculateDaoProgress(activeDao.tasks) : 0;
 
   /**
    * Gestion des mises à jour de tâche (progress, commentaire, applicabilité, assignations)
