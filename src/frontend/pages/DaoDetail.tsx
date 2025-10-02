@@ -893,7 +893,7 @@ export default function DaoDetail() {
                   {progress}% terminé
                 </Badge>
                 <ExportFilterDialog
-                  tasks={dao.tasks}
+                  tasks={activeDao?.tasks || []}
                   onExport={handleExportWithOptions}
                 >
                   <Button variant="outline" size="sm" className="px-3 h-8">
@@ -933,7 +933,7 @@ export default function DaoDetail() {
                   {progress}% terminé
                 </Badge>
                 <ExportFilterDialog
-                  tasks={dao.tasks}
+                  tasks={activeDao?.tasks || []}
                   onExport={handleExportWithOptions}
                 >
                   <Button variant="outline" size="sm">
