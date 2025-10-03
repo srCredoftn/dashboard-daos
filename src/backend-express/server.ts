@@ -3,7 +3,7 @@
 Rôle: Entrée/Bootstrap backend — src/backend-express/server.ts
 Domaine: Backend/Core
 Dépendances: ./index.js, ./utils/logger.js
-Sécurité: veille à la validation d’entrée, gestion JWT/refresh, et limites de débit
+Sécurité: veille à la validation d’entrée et à la gestion JWT/refresh
 */
 /**
  * Bootstrap serveur: instancie l'app Express et démarre l'écoute, logs, arrêt gracieux.
@@ -22,7 +22,6 @@ app.listen(PORT, () => {
   logger.info(`🔐 Fonctionnalités de sécurité activées :`, "SERVER");
   logger.info(`  ✅ Hachage des mots de passe avec bcrypt`, "SERVER");
   logger.info(`  ✅ Jetons JWT avec expiration`, "SERVER");
-  logger.info(`  ✅ Limitation de débit (rate limiting)`, "SERVER");
   logger.info(`  ✅ Validation des entrées`, "SERVER");
   logger.info(`  ✅ Protection CORS`, "SERVER");
   logger.info(`  ✅ En-têtes de sécurité Helmet`, "SERVER");

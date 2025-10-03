@@ -2,21 +2,19 @@
 Rôle: Entrée/Bootstrap backend — src/backend-express/index.ts
 Domaine: Backend/Core
 Exports: createServer
-Dépendances: express, cors, helmet, express-rate-limit, ./utils/logger, ./utils/rate-limit-debug, ./routes/demo, ./routes/dao-simple
-Sécurité: veille à la validation d’entrée, gestion JWT/refresh, et limites de débit
+Dépendances: express, cors, helmet, ./utils/logger, ./routes/demo, ./routes/dao-simple
+Sécurité: veille à la validation d’entrée, gestion JWT/refresh
 Performance: cache/partitionnement/bundling optimisés
 */
 /**
- * Express app: sécurité (helmet, rate-limit, CORS), routes API, boot/reset, logs, gestion d'erreurs.
+ * Express app: sécurité (helmet, CORS), routes API, boot/reset, logs, gestion d'erreurs.
  * Utilisé par server.ts pour démarrer le backend.
  */
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
-import rateLimit from "express-rate-limit";
 import { logger, requestLogger } from "./utils/logger";
-import { RateLimitDebugger } from "./utils/rate-limit-debug";
 import { retryMiddleware } from "./middleware/retry";
 import { handleDemo } from "./routes/demo";
 import daoRoutes from "./routes/dao-simple";
@@ -64,9 +62,6 @@ export function createServer(): express.Application {
     return runtimeBootId;
   }
 
-  // Faire confiance au proxy pour le rate limiting en développement
-  app.set("trust proxy", 1);
-
   // Middleware de sécurité
   app.use(
     helmet({
@@ -82,40 +77,6 @@ export function createServer(): express.Application {
       },
     }),
   );
-
-  // Limitation de débit
-  const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: process.env.NODE_ENV === "production" ? 100 : 1000, // More permissive in development
-    message: {
-      error: "Trop de requêtes depuis cette IP, veuillez réessayer plus tard.",
-      retryAfter: "15 minutes",
-    },
-    standardHeaders: true,
-    legacyHeaders: false,
-  });
-  app.use(limiter);
-
-  // Limitation de débit spécifique à l'auth (adaptative selon l'environnement)
-  const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: process.env.NODE_ENV === "production" ? 20 : 100, // Plus permissif en développement
-    message: {
-      error:
-        "Trop de tentatives d’authentification, veuillez réessayer plus tard.",
-      retryAfter: "15 minutes",
-    },
-    standardHeaders: true,
-    legacyHeaders: false,
-    // Skip rate limiting pour certains cas en développement
-    skip: (_req) => {
-      if (process.env.NODE_ENV === "development") {
-        // Plus de flexibilité en dev, mais garde une protection minimale
-        return false;
-      }
-      return false;
-    },
-  });
 
   // Configuration CORS — restrictive en production, permissive en développement (autorise l’origine de prévisualisation Builder)
   const corsOptions: cors.CorsOptions = {
@@ -191,12 +152,6 @@ export function createServer(): express.Application {
   // Middleware d’aide au retry (ajoute req.retry)
   app.use(retryMiddleware(3, 200));
 
-  // Debug rate limiting en développement
-  if (process.env.NODE_ENV === "development") {
-    app.use(RateLimitDebugger.autoLog());
-    app.get("/api/debug/rate-limits", RateLimitDebugger.getDebugRoute());
-  }
-
   // Endpoint de vérification de santé
   app.get("/api/health", (_req, res) => {
     res.json({
@@ -269,9 +224,6 @@ export function createServer(): express.Application {
   });
 
   app.get("/api/demo", handleDemo);
-
-  // Appliquer la limitation de débit spécifique à l’auth aux routes d’authentification
-  app.use("/api/auth", authLimiter);
 
   // Routes API
   app.use("/api/dao", daoRoutes);

@@ -1,9 +1,9 @@
 /**
 Rôle: Middleware Express — src/backend-express/middleware/auth.ts
 Domaine: Backend/Middleware
-Exports: authorize, requireAdmin, requireDaoLeaderOrAdmin, requireUser, requireAuth, requireOwnership, auditLog, sensitiveOperationLimit
+Exports: authorize, requireAdmin, requireDaoLeaderOrAdmin, requireUser, requireAuth, requireOwnership, auditLog
 Dépendances: express, ../services/authService, ../services/daoService, ../utils/logger, @shared/dao
-Sécurité: veille à la validation d’entrée, gestion JWT/refresh, et limites de débit
+Sécurité: veille à la validation d’entrée et à la gestion JWT/refresh
 */
 /**
  * Middlewares d'authentification/autorisation backend
@@ -310,44 +310,6 @@ export function auditLog(action: string) {
       return originalSend.call(this, body);
     };
 
-    next();
-  };
-}
-
-/**
- * Limiteur de tentatives pour opérations sensibles (ex: création).
- * - Fenêtre courte, seuil plus permissif en dev
- */
-export function sensitiveOperationLimit() {
-  const attempts = new Map<string, { count: number; resetTime: number }>();
-  const MAX_ATTEMPTS = process.env.NODE_ENV === "production" ? 5 : 20; // Plus permissif en dev
-  const WINDOW_MS =
-    process.env.NODE_ENV === "production" ? 60 * 1000 : 30 * 1000; // Fenêtre plus courte en dev
-
-  return (req: Request, res: Response, next: NextFunction) => {
-    const key = `${req.ip}:${req.user?.id || "anonymous"}`;
-    const now = Date.now();
-    const userAttempts = attempts.get(key);
-
-    if (!userAttempts || now > userAttempts.resetTime) {
-      attempts.set(key, { count: 1, resetTime: now + WINDOW_MS });
-      return next();
-    }
-
-    if (userAttempts.count >= MAX_ATTEMPTS) {
-      logger.security(
-        "Limite de tentatives dépassée pour une opération sensible",
-        req.user?.id,
-        req.ip,
-      );
-      return void res.status(429).json({
-        error: "Trop de tentatives, veuillez réessayer plus tard",
-        retryAfter: Math.ceil((userAttempts.resetTime - now) / 1000),
-        code: "RATE_LIMITED",
-      });
-    }
-
-    userAttempts.count++;
     next();
   };
 }

@@ -13,7 +13,6 @@ import {
   authenticate,
   requireAdmin,
   auditLog,
-  sensitiveOperationLimit,
   requireDaoLeaderOrAdmin,
 } from "../middleware/auth";
 import { devLog } from "../utils/devLog";
