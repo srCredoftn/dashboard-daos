@@ -89,6 +89,13 @@ function sanitizeString(input: string): string {
     .trim();
 }
 
+function splitMessageLines(message: string): string[] {
+  return message
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+}
+
 /**
  * GET /api/dao
  * Liste les DAO avec filtres/tri/pagination côté serveur.
