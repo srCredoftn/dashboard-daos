@@ -6,6 +6,7 @@ import * as React from "react";
  * Accessibilité: structure sémantique (titre <h3/>) et séparation claire des zones.
  * Astuce: composer Card + CardHeader + CardContent + CardFooter pour des layouts consistants.
  */
+import * as React from "react";
 import { cn } from "@/lib/utils";
 
 /**
