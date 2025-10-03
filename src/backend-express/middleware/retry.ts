@@ -3,7 +3,7 @@ Rôle: Middleware Express — src/backend-express/middleware/retry.ts
 Domaine: Backend/Middleware
 Exports: RetryFn, retryMiddleware
 Dépendances: express
-Sécurité: veille à la validation d’entrée, gestion JWT/refresh, et limites de débit
+Sécurité: veille à la validation d’entrée et à la gestion JWT/refresh
 */
 import type { Request, Response, NextFunction } from "express";
 
