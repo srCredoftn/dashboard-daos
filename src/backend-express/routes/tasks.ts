@@ -13,6 +13,7 @@ import { authenticate, requireAdmin, auditLog } from "../middleware/auth";
 import { getIdempotency, setIdempotency } from "../utils/idempotency";
 import type { DaoTask } from "@shared/dao";
 import { DaoService } from "../services/daoService";
+import { DaoChangeLogService } from "../services/daoChangeLogService";
 import { Templates, emailAllUsers, sendEmail } from "../services/txEmail";
 import { logger } from "../utils/logger";
 
@@ -215,6 +216,10 @@ router.put(
           )
         : DaoService.updateDao(daoId, { tasks: dao.tasks }));
 
+      const historyEventCreatedAt =
+        task.lastUpdatedAt || new Date().toISOString();
+      let historyPayload: { summary: string; lines: string[] } | null = null;
+
       // E-mails
       try {
         if (dao) {
@@ -224,9 +229,31 @@ router.put(
             current: task,
             action: "Mise à jour",
           });
+          historyPayload = {
+            summary: `Nom de tâche mis à jour — ${task.name}`,
+            lines: [
+              `Numéro de liste : ${dao.numeroListe}`,
+              `Tâche ${task.id}`,
+              `Ancien nom : ${previous.name}`,
+              `Nouveau nom : ${task.name}`,
+              `Mis à jour par : ${req.user?.email || req.user?.id || "inconnu"}`,
+            ],
+          };
           await emailAllUsers(t.subject, t.body, "TASK_UPDATED");
         }
       } catch (_) {}
+
+      if (historyPayload) {
+        try {
+          DaoChangeLogService.recordEvent({
+            dao,
+            summary: historyPayload.summary,
+            lines: historyPayload.lines,
+            eventType: "dao_task_update",
+            createdAt: historyEventCreatedAt,
+          });
+        } catch (_) {}
+      }
 
       logger.audit("Task name updated", req.user?.id, req.ip);
       return res.json(updated);

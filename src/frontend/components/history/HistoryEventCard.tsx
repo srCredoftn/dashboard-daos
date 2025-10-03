@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { DaoHistoryEntry, DaoHistoryEventType } from "@shared/api";
 import { cn } from "@/lib/utils";
