@@ -145,6 +145,40 @@ export function tplDaoDeleted(
   };
 }
 
+// Agrégation (validation)
+export function tplDaoAggregatedUpdate(params: {
+  dao: Dao;
+  lines: string[];
+}): Pick<ServerNotification, "type" | "title" | "message" | "data"> {
+  const { dao, lines } = params;
+  const msg = lines.join("\n");
+  return {
+    type: "dao_updated",
+    title: "Mise à jour DAO",
+    message: msg,
+    data: { event: "dao_aggregated_update", daoId: dao.id },
+  };
+}
+
+export function tplLeaderChanged(params: {
+  dao: Dao;
+  oldLeader?: string | null;
+  newLeader?: string | null;
+}): Pick<ServerNotification, "type" | "title" | "message" | "data"> {
+  const { dao, oldLeader, newLeader } = params;
+  const lines = [
+    `Numéro de liste : ${dao.numeroListe}`,
+    `Ancien Chef d'équipe : ${oldLeader || "Non défini"}`,
+    `Nouveau Chef d'équipe : ${newLeader || "Non défini"}`,
+  ];
+  return {
+    type: "role_update",
+    title: "Changement de chef d'équipe",
+    message: lines.join("\n"),
+    data: { event: "leader_changed", daoId: dao.id },
+  };
+}
+
 // ===== TASK templates =====
 export function tplTaskNotification(params: {
   dao: Dao;
