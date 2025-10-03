@@ -25,8 +25,9 @@ export function sensitiveOperationLimit(options: SensitiveLimitOptions = {}): Re
     standardHeaders: true,
     legacyHeaders: false,
     keyGenerator: (req: any) => {
+      const base = ipKeyGenerator(req as any);
       const userId = req?.user?.id ? String(req.user.id) : "anon";
-      return `${req.ip}:${userId}`;
+      return `${base}:${userId}`;
     },
     handler: (_req: Request, res: Response) => {
       const retryAfter = res.getHeader("Retry-After");
