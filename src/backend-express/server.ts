@@ -3,7 +3,7 @@
 Rôle: Entrée/Bootstrap backend — src/backend-express/server.ts
 Domaine: Backend/Core
 Dépendances: ./index.js, ./utils/logger.js
-Sécurité: veille à la validation d’entrée, gestion JWT/refresh, et limites de débit
+Sécurité: veille à la validation d’entrée et à la gestion JWT/refresh
 */
 /**
  * Bootstrap serveur: instancie l'app Express et démarre l'écoute, logs, arrêt gracieux.
