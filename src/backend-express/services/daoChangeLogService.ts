@@ -6,7 +6,11 @@ Liens: utilisé par routes DAO/Tâches/Commentaires et endpoint de validation
 */
 import type { Dao, DaoTask } from "@shared/dao";
 import { logger } from "../utils/logger";
-import type { DaoAggregatedSummary, DaoHistoryEntry } from "@shared/api";
+import type {
+  DaoAggregatedSummary,
+  DaoHistoryEntry,
+  DaoHistoryEventType,
+} from "@shared/api";
 
 interface PendingTaskChange {
   taskId: number;
