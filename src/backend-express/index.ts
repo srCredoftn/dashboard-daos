@@ -152,12 +152,6 @@ export function createServer(): express.Application {
   // Middleware d’aide au retry (ajoute req.retry)
   app.use(retryMiddleware(3, 200));
 
-  // Debug rate limiting en développement
-  if (process.env.NODE_ENV === "development") {
-    app.use(RateLimitDebugger.autoLog());
-    app.get("/api/debug/rate-limits", RateLimitDebugger.getDebugRoute());
-  }
-
   // Endpoint de vérification de santé
   app.get("/api/health", (_req, res) => {
     res.json({
