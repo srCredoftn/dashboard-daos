@@ -168,6 +168,10 @@ router.put("/:id", authenticate, async (req, res) => {
       if (dao) {
         const task = dao.tasks.find((t) => t.id === updatedComment.taskId);
         if (task) {
+          try {
+            const snapshot = { ...task, comment: updatedComment.content } as typeof task;
+            DaoChangeLogService.recordTaskChange(dao, snapshot);
+          } catch (_) {}
           const notif = tplTaskNotification({
             dao,
             previous: task,
