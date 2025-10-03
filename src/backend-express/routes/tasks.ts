@@ -216,7 +216,8 @@ router.put(
           )
         : DaoService.updateDao(daoId, { tasks: dao.tasks }));
 
-      const historyEventCreatedAt = task.lastUpdatedAt || new Date().toISOString();
+      const historyEventCreatedAt =
+        task.lastUpdatedAt || new Date().toISOString();
       let historyPayload: { summary: string; lines: string[] } | null = null;
 
       // E-mails
