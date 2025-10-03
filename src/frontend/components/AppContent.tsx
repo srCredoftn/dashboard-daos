@@ -28,6 +28,7 @@ import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
 import Clean from "@/pages/Clean";
 import AdminHealth from "@/pages/AdminHealth";
+import DaoHistory from "@/pages/DaoHistory";
 
 export default function AppContent() {
   const showNetworkAlert = import.meta.env.VITE_SHOW_NETWORK_ALERT === "true";
@@ -73,6 +74,16 @@ export default function AppContent() {
                 <AuthenticatedRoute>
                   <LazyLoader fallback={<PageFallback />}>
                     <DaoDetail />
+                  </LazyLoader>
+                </AuthenticatedRoute>
+              }
+            />
+            <Route
+              path="/history"
+              element={
+                <AuthenticatedRoute>
+                  <LazyLoader fallback={<PageFallback />}>
+                    <DaoHistory />
                   </LazyLoader>
                 </AuthenticatedRoute>
               }

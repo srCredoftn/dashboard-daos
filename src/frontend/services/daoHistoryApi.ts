@@ -93,12 +93,8 @@ class DaoHistoryApi {
           } catch (refreshErr) {
             devLog.error("Échec du rafraîchissement de session", refreshErr);
           }
-          localStorage.removeItem("auth_token");
-          localStorage.removeItem("auth_user");
-          if (!window.location.pathname.includes("/login")) {
-            window.location.href = "/login";
-          }
-          throw new Error("Session expirée. Veuillez vous reconnecter.");
+          // Ne pas rediriger automatiquement: laisser l'UI décider
+          throw new Error("UNAUTHORIZED");
         }
 
         const errorData = await response.json().catch(() => ({}));
