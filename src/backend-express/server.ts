@@ -22,7 +22,6 @@ app.listen(PORT, () => {
   logger.info(`🔐 Fonctionnalités de sécurité activées :`, "SERVER");
   logger.info(`  ✅ Hachage des mots de passe avec bcrypt`, "SERVER");
   logger.info(`  ✅ Jetons JWT avec expiration`, "SERVER");
-  logger.info(`  ✅ Limitation de débit (rate limiting)`, "SERVER");
   logger.info(`  ✅ Validation des entrées`, "SERVER");
   logger.info(`  ✅ Protection CORS`, "SERVER");
   logger.info(`  ✅ En-têtes de sécurité Helmet`, "SERVER");
