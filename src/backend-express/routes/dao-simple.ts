@@ -380,7 +380,7 @@ router.put(
 
       const before = await DaoService.getDaoById(id);
 
-      // Restreindre l’admin (non-chef) de changer la progression/l’applicabilité/les assignations des tâches via mise à jour de masse
+      // Restreindre l���admin (non-chef) de changer la progression/l’applicabilité/les assignations des tâches via mise à jour de masse
       try {
         const isAdmin = req.user?.role === "admin";
         const isLeader = before?.equipe?.some(
@@ -981,23 +981,21 @@ router.post(
         });
       }
 
-      const summary = DaoChangeLogService.buildAggregatedSummary(dao, 6);
-      if (!summary) {
+      const aggregated = DaoChangeLogService.aggregateAndClear(dao, 6);
+      if (!aggregated) {
         return void res
           .status(200)
           .json({ ok: true, message: "Aucune modification" });
       }
+
+      const { summary, history } = aggregated;
 
       try {
         const t = tplDaoAggregatedUpdate({ dao, lines: summary.lines });
         NotificationService.broadcast(t.type, t.title, t.message, t.data);
       } catch (_) {}
 
-      // Historiser et nettoyer
-      const entry = DaoChangeLogService.finalizeAndStoreHistory(summary);
-      DaoChangeLogService.clearPending(dao.id);
-
-      return void res.json({ ok: true, summary, historyId: entry.id });
+      return void res.json({ ok: true, summary, historyId: history.id });
     } catch (error) {
       logger.error("Échec de validation des changements", "DAO_VALIDATE", {
         message: String((error as Error)?.message),
