@@ -78,27 +78,6 @@ export function createServer(): express.Application {
     }),
   );
 
-  // Limitation de débit spécifique à l'auth (adaptative selon l'environnement)
-  const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: process.env.NODE_ENV === "production" ? 20 : 100, // Plus permissif en développement
-    message: {
-      error:
-        "Trop de tentatives d’authentification, veuillez réessayer plus tard.",
-      retryAfter: "15 minutes",
-    },
-    standardHeaders: true,
-    legacyHeaders: false,
-    // Skip rate limiting pour certains cas en développement
-    skip: (_req) => {
-      if (process.env.NODE_ENV === "development") {
-        // Plus de flexibilité en dev, mais garde une protection minimale
-        return false;
-      }
-      return false;
-    },
-  });
-
   // Configuration CORS — restrictive en production, permissive en développement (autorise l’origine de prévisualisation Builder)
   const corsOptions: cors.CorsOptions = {
     origin: (origin, callback) => {
