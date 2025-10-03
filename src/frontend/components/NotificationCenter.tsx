@@ -7,6 +7,7 @@ Liens: ui/* (atomes), hooks, contexts, services côté client
 */
 import { useState } from "react";
 import { Bell, BellDot, X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -14,12 +15,31 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { useNotifications } from "@/contexts/NotificationContext";
+import { cn } from "@/lib/utils";
+import {
+  useNotifications,
+  type ClientNotification,
+} from "@/contexts/NotificationContext";
 
 export default function NotificationCenter() {
-  const { notifications, unreadCount, removeNotification, clearAll, refresh } =
-    useNotifications();
+  const {
+    notifications,
+    unreadCount,
+    removeNotification,
+    clearAll,
+    refresh,
+    markAsRead,
+  } = useNotifications();
   const [isOpen, setIsOpen] = useState(false);
+  const navigate = useNavigate();
+
+  const handleNotificationNavigation = (notification: ClientNotification) => {
+    const daoId = notification.data?.daoId;
+    if (!daoId) return;
+    setIsOpen(false);
+    markAsRead(notification.id).catch(() => {});
+    navigate(`/dao/${daoId}`);
+  };
 
   return (
     <Popover
@@ -82,40 +102,73 @@ export default function NotificationCenter() {
             </div>
           ) : (
             <div className="space-y-2 max-h-[70vh] overflow-y-auto">
-              {notifications.slice(0, 50).map((notification) => (
-                <div
-                  key={notification.id}
-                  className={`p-3 rounded-lg border ${
-                    !notification.read
-                      ? "bg-blue-50 border-blue-200"
-                      : "bg-gray-50"
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">
-                        {notification.title}
-                      </p>
-                      <p className="text-xs text-gray-600 mt-1">
-                        {notification.message}
-                      </p>
-                      <p className="text-xs text-gray-400 mt-1">
-                        {new Date(notification.createdAt).toLocaleString(
-                          "fr-FR",
-                        )}
-                      </p>
+              {notifications.slice(0, 50).map((notification) => {
+                const isClickable = Boolean(notification?.data?.daoId);
+                const containerClasses = cn(
+                  "p-3 rounded-lg border transition-colors focus:outline-none",
+                  !notification.read
+                    ? "bg-blue-50 border-blue-200"
+                    : "bg-gray-50 border-border",
+                  isClickable &&
+                    "cursor-pointer hover:border-sky-300 hover:bg-sky-50 focus:ring-2 focus:ring-sky-500 focus:ring-offset-1",
+                );
+
+                return (
+                  <div
+                    key={notification.id}
+                    className={containerClasses}
+                    role={isClickable ? "button" : undefined}
+                    tabIndex={isClickable ? 0 : undefined}
+                    onClick={() =>
+                      isClickable
+                        ? handleNotificationNavigation(notification)
+                        : undefined
+                    }
+                    onKeyDown={(event) => {
+                      if (!isClickable) return;
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        handleNotificationNavigation(notification);
+                      }
+                    }}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground">
+                          {notification.title}
+                        </p>
+                        <p
+                          className="text-xs text-gray-600 mt-1 whitespace-pre-line"
+                          style={{
+                            display: "-webkit-box",
+                            WebkitBoxOrient: "vertical",
+                            WebkitLineClamp: 4,
+                            overflow: "hidden",
+                          }}
+                        >
+                          {notification.message}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1">
+                          {new Date(notification.createdAt).toLocaleString(
+                            "fr-FR",
+                          )}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          removeNotification(notification.id);
+                        }}
+                        className="h-6 w-6 p-0 ml-2 shrink-0"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeNotification(notification.id)}
-                      className="h-6 w-6 p-0 ml-2"
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
