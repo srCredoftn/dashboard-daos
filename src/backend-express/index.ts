@@ -225,9 +225,6 @@ export function createServer(): express.Application {
 
   app.get("/api/demo", handleDemo);
 
-  // Appliquer la limitation de débit spécifique à l’auth aux routes d’authentification
-  app.use("/api/auth", authLimiter);
-
   // Routes API
   app.use("/api/dao", daoRoutes);
   app.use("/api/dao", taskRoutes); // Task routes are nested under /api/dao
