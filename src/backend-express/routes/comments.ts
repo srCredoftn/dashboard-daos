@@ -13,6 +13,7 @@ import { authenticate } from "../middleware/auth";
 import { getIdempotency, setIdempotency } from "../utils/idempotency";
 import { logger } from "../utils/logger";
 import { DaoService } from "../services/daoService";
+import { DaoChangeLogService } from "../services/daoChangeLogService";
 import { NotificationService } from "../services/notificationService";
 import { tplTaskNotification } from "../services/notificationTemplates";
 
