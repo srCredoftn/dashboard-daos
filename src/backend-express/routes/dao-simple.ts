@@ -494,7 +494,7 @@ router.put(
 
             NotificationService.broadcast(
               "role_update",
-              "Modification de l'équipe",
+              "Modification de l'��quipe",
               changed.join(", "),
               { daoId: updated.id, changes: changed },
             );
@@ -533,7 +533,14 @@ router.put(
           (res as any).hasTaskChanges || hasTaskChanges;
       } catch (_) {}
 
-      // Always broadcast a general DAO update and email all users
+      // Always broadcast a general DAO update, enregistrer l'historique et email all users
+      let historyPayload:
+        | {
+            summary: string;
+            lines: string[];
+            eventType: "dao_created" | "dao_updated" | "dao_task_update" | "dao_team_update";
+          }
+        | null = null;
       try {
         const hasTaskChanges = (res as any).hasTaskChanges === true;
 
@@ -558,8 +565,34 @@ router.put(
         if (changedKeys.size > 0 || !hasTaskChanges) {
           const t = tplDaoUpdated(updated, changedKeys);
           NotificationService.broadcast(t.type, t.title, t.message, t.data);
+          historyPayload = {
+            summary: t.title,
+            lines: splitMessageLines(t.message),
+            eventType: "dao_updated",
+          };
+        } else if (hasTaskChanges) {
+          historyPayload = {
+            summary: "Mise à jour des tâches du DAO",
+            lines: [
+              `Le DAO ${updated.numeroListe} a reçu des mises à jour de tâches.`,
+              "Consultez le détail des tâches pour visualiser les changements.",
+            ],
+            eventType: "dao_task_update",
+          };
         }
       } catch (_) {}
+
+      if (historyPayload) {
+        try {
+          DaoChangeLogService.recordEvent({
+            dao: updated,
+            summary: historyPayload.summary,
+            lines: historyPayload.lines,
+            eventType: historyPayload.eventType,
+            createdAt: updated.updatedAt,
+          });
+        } catch (_) {}
+      }
 
       logger.audit("DAO mis à jour avec succès", req.user?.id, req.ip);
       res.json(updated);
