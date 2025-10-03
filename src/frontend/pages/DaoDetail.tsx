@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
  * Perf: mises à jour optimistes, debounce des sauvegardes, import dynamique de jsPDF.
  */
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, FileText, Download, Edit3 } from "lucide-react";
+import { ArrowLeft, FileText, Download, Edit3, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -38,12 +38,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { useToast } from "@/hooks/use-toast";
 import jsPDF from "jspdf";
+import { daoHistoryApi } from "@/services/daoHistoryApi";
 
 export default function DaoDetail() {
   // Paramètres / état global de navigation et droits
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
 
   // État métier
   const [dao, setDao] = useState<Dao | null>(null);
@@ -52,6 +53,7 @@ export default function DaoDetail() {
   const { refresh: refreshNotifications } = useNotifications();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isValidating, setIsValidating] = useState(false);
 
   // Édition inline (autorité, référence, objet du dossier)
   const [isEditingAuthority, setIsEditingAuthority] = useState(false);
@@ -184,6 +186,10 @@ export default function DaoDetail() {
 
   // Calculs dérivés
   const progress = calculateDaoProgress(dao.tasks);
+  const isTeamLead = dao.equipe.some(
+    (m) => m.id === user?.id && m.role === "chef_equipe",
+  );
+  const canValidate = isTeamLead || isAdmin();
 
   /**
    * Gestion des mises à jour de tâche (progress, commentaire, applicabilité, assignations)
@@ -931,6 +937,36 @@ export default function DaoDetail() {
                 <Badge variant="destructive" className="text-xs font-bold">
                   {progress}% terminé
                 </Badge>
+                {canValidate && (
+                  <Button
+                    size="sm"
+                    onClick={async () => {
+                      if (!dao || isValidating) return;
+                      setIsValidating(true);
+                      try {
+                        const res = await daoHistoryApi.validateDao(dao.id);
+                        if (res?.summary) {
+                          toast({
+                            title: "Modifications validées",
+                            description: res.summary.lines.slice(0, 3).join("\n"),
+                          });
+                          try { await refreshNotifications(); } catch {}
+                        } else if (res?.message) {
+                          toast({ title: res.message });
+                        }
+                      } catch (e) {
+                        toast({ title: "Échec de validation", description: e instanceof Error ? e.message : String(e), variant: "destructive" });
+                      } finally {
+                        setIsValidating(false);
+                      }
+                    }}
+                    disabled={isValidating}
+                    className="px-3 h-8"
+                  >
+                    <CheckCircle2 className="h-4 w-4 mr-1" />
+                    <span className="text-sm">{isValidating ? "Validation…" : "Valider"}</span>
+                  </Button>
+                )}
                 <ExportFilterDialog
                   tasks={dao.tasks}
                   onExport={handleExportWithOptions}
@@ -971,6 +1007,35 @@ export default function DaoDetail() {
                 <Badge variant="destructive" className="text-sm font-bold">
                   {progress}% terminé
                 </Badge>
+                {canValidate && (
+                  <Button
+                    size="sm"
+                    onClick={async () => {
+                      if (!dao || isValidating) return;
+                      setIsValidating(true);
+                      try {
+                        const res = await daoHistoryApi.validateDao(dao.id);
+                        if (res?.summary) {
+                          toast({
+                            title: "Modifications validées",
+                            description: res.summary.lines.slice(0, 3).join("\n"),
+                          });
+                          try { await refreshNotifications(); } catch {}
+                        } else if (res?.message) {
+                          toast({ title: res.message });
+                        }
+                      } catch (e) {
+                        toast({ title: "Échec de validation", description: e instanceof Error ? e.message : String(e), variant: "destructive" });
+                      } finally {
+                        setIsValidating(false);
+                      }
+                    }}
+                    disabled={isValidating}
+                  >
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    {isValidating ? "Validation…" : "Valider"}
+                  </Button>
+                )}
                 <ExportFilterDialog
                   tasks={dao.tasks}
                   onExport={handleExportWithOptions}
