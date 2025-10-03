@@ -37,6 +37,34 @@ class InMemoryDaoChangeLogService {
     return `${y}-${m}-${dd}`;
   }
 
+  private pushEntry(entry: DaoHistoryEntry): DaoHistoryEntry {
+    const key = this.dayKey(new Date(entry.createdAt));
+    const arr = this.historyByDay.get(key) || [];
+    arr.unshift(entry);
+    this.historyByDay.set(key, arr.slice(0, 1000));
+    return entry;
+  }
+
+  recordEvent(params: {
+    dao: Pick<Dao, "id" | "numeroListe">;
+    summary: string;
+    lines: string[];
+    eventType: DaoHistoryEventType;
+    createdAt?: string;
+  }): DaoHistoryEntry {
+    const createdAt = params.createdAt || new Date().toISOString();
+    const entry: DaoHistoryEntry = {
+      id: `hist_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      daoId: params.dao.id,
+      numeroListe: params.dao.numeroListe,
+      createdAt,
+      summary: params.summary,
+      lines: params.lines,
+      eventType: params.eventType,
+    };
+    return this.pushEntry(entry);
+  }
+
   recordTaskChange(dao: Dao, task: DaoTask): void {
     const p = this.ensurePending(dao);
     const rec: PendingTaskChange = {
