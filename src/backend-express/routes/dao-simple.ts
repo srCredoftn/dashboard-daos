@@ -304,10 +304,21 @@ router.post(
 
       logger.audit("DAO créé avec succès", req.user?.id, req.ip);
 
-      // Notifier la plateforme et envoyer un e-mail à tous les utilisateurs
+      // Notifier la plateforme et enregistrer l'historique
       try {
         const t = tplDaoCreated(newDao);
         NotificationService.broadcast(t.type, t.title, t.message, t.data);
+        const lines = splitMessageLines(t.message);
+        const fallbackLines = lines.length
+          ? lines
+          : [`DAO ${newDao.numeroListe} créé par ${req.user?.name || "un utilisateur"}`];
+        DaoChangeLogService.recordEvent({
+          dao: newDao,
+          summary: t.title,
+          lines: fallbackLines,
+          eventType: "dao_created",
+          createdAt: newDao.createdAt,
+        });
       } catch (_) {}
 
       res.status(201).json(newDao);
