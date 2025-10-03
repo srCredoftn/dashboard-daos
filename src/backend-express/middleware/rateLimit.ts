@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import type { RequestHandler } from "express";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 
 interface SensitiveLimitOptions {
   windowMs?: number;
