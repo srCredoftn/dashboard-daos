@@ -232,6 +232,13 @@ router.delete("/:id", authenticate, async (req, res) => {
         if (dao) {
           const task = dao.tasks.find((t) => t.id === comment.taskId);
           if (task) {
+            try {
+              const removed = comment.content
+                ? `(supprimé) ${comment.content}`
+                : "(commentaire supprimé)";
+              const snapshot = { ...task, comment: removed } as typeof task;
+              DaoChangeLogService.recordTaskChange(dao, snapshot);
+            } catch (_) {}
             const notif = tplTaskNotification({
               dao,
               previous: task,
