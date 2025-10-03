@@ -32,6 +32,7 @@ import {
 } from "../services/notificationTemplates";
 import { daoStorage } from "../data/daoStorage";
 import { DaoChangeLogService } from "../services/daoChangeLogService";
+import type { DaoHistoryEventType } from "@shared/api";
 
 const router = express.Router();
 
