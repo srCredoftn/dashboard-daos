@@ -27,8 +27,11 @@ import {
   tplDaoUpdated,
   tplDaoDeleted,
   tplTaskNotification,
+  tplDaoAggregatedUpdate,
+  tplLeaderChanged,
 } from "../services/notificationTemplates";
 import { daoStorage } from "../data/daoStorage";
+import { DaoChangeLogService } from "../services/daoChangeLogService";
 
 const router = express.Router();
 
