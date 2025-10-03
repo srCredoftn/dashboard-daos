@@ -32,6 +32,7 @@ import {
 import { daoStorage } from "../data/daoStorage";
 import { DaoChangeLogService } from "../services/daoChangeLogService";
 import type { DaoHistoryEventType } from "@shared/api";
+import { sensitiveOperationLimit } from "../middleware/rateLimit";
 
 const router = express.Router();
 
