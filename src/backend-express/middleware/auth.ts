@@ -1,9 +1,9 @@
 /**
 Rôle: Middleware Express — src/backend-express/middleware/auth.ts
 Domaine: Backend/Middleware
-Exports: authorize, requireAdmin, requireDaoLeaderOrAdmin, requireUser, requireAuth, requireOwnership, auditLog, sensitiveOperationLimit
+Exports: authorize, requireAdmin, requireDaoLeaderOrAdmin, requireUser, requireAuth, requireOwnership, auditLog
 Dépendances: express, ../services/authService, ../services/daoService, ../utils/logger, @shared/dao
-Sécurité: veille à la validation d’entrée, gestion JWT/refresh, et limites de débit
+Sécurité: veille à la validation d’entrée et à la gestion JWT/refresh
 */
 /**
  * Middlewares d'authentification/autorisation backend
