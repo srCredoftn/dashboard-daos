@@ -17,7 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { User, LogOut, Settings, Shield, Users, X } from "lucide-react";
+import { User, LogOut, Settings, Shield, Users, X, Clock } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getAvatarUrl } from "@/utils/avatar";
 import NotificationCenter from "@/components/NotificationCenter";
@@ -111,6 +111,10 @@ export function AppHeader({ title, children }: AppHeaderProps) {
 
           {/* Right side - Always on one line */}
           <div className="flex items-center space-x-2">
+            <Button variant="outline" size="sm" onClick={() => navigate("/history")}>
+              <Clock className="h-4 w-4" />
+              <span className="ml-2 hidden sm:inline">Historique</span>
+            </Button>
             <NotificationCenter />
             {user && (
               <>
@@ -322,6 +326,19 @@ export function AppHeader({ title, children }: AppHeaderProps) {
                     </AvatarFallback>
                   </Avatar>
                   <span className="font-medium text-gray-700">Mon profil</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    navigate("/history");
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="w-full flex items-center space-x-4 p-4 text-left hover:bg-gray-100 rounded-xl transition-colors group"
+                >
+                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center group-hover:bg-blue-200 transition-colors">
+                    <Clock className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <span className="font-medium text-gray-700">Historique</span>
                 </button>
 
                 {isAdmin() && (
