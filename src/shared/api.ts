@@ -18,6 +18,15 @@ export interface DemoResponse {
 }
 
 /**
+ * Types d'événements historisés pour un DAO
+ */
+export type DaoHistoryEventType =
+  | "dao_created"
+  | "dao_updated"
+  | "dao_task_update"
+  | "dao_team_update";
+
+/**
  * Entrée d'historique des modifications de DAO (journal quotidien)
  */
 export interface DaoHistoryEntry {
@@ -27,6 +36,7 @@ export interface DaoHistoryEntry {
   createdAt: string; // ISO
   summary: string; // Titre + courte synthèse
   lines: string[]; // Lignes détaillées (affichage)
+  eventType: DaoHistoryEventType;
 }
 
 /**
