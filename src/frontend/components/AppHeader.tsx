@@ -111,14 +111,6 @@ export function AppHeader({ title, children }: AppHeaderProps) {
 
           {/* Right side - Always on one line */}
           <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate("/history")}
-            >
-              <Clock className="h-4 w-4" />
-              <span className="ml-2 hidden sm:inline">Historique</span>
-            </Button>
             <NotificationCenter />
             {user && (
               <>
