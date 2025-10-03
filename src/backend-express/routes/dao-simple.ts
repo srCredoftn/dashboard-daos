@@ -539,7 +539,7 @@ router.put(
         | {
             summary: string;
             lines: string[];
-            eventType: "dao_created" | "dao_updated" | "dao_task_update" | "dao_team_update";
+            eventType: DaoHistoryEventType;
           }
         | null = null;
       try {
