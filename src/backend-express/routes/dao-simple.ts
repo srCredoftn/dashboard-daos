@@ -76,7 +76,7 @@ const taskUpdateSchema = z.object({
 });
 
 /**
- * Nettoie une cha��ne utilisateur:
+ * Nettoie une chaîne utilisateur:
  * - retire balises <script>/<style>
  * - supprime toutes balises HTML restantes
  * - trim
@@ -884,7 +884,13 @@ router.put(
 
       const updated = await DaoService.updateDao(id, { tasks: dao.tasks });
 
-      // Broadcast task notification to all users
+      // Enregistrer pour agrégation (validation)
+      try {
+        const fullDao = await DaoService.getDaoById(id);
+        if (fullDao) DaoChangeLogService.recordTaskChange(fullDao, task);
+      } catch (_) {}
+
+      // Broadcast task notification à tous les utilisateurs
       try {
         const prevSet = new Set(previous.assignedTo || []);
         const currSet = new Set(task.assignedTo || []);
