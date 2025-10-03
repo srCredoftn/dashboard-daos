@@ -2,8 +2,8 @@
 Rôle: Entrée/Bootstrap backend — src/backend-express/index.ts
 Domaine: Backend/Core
 Exports: createServer
-Dépendances: express, cors, helmet, express-rate-limit, ./utils/logger, ./utils/rate-limit-debug, ./routes/demo, ./routes/dao-simple
-Sécurité: veille à la validation d’entrée, gestion JWT/refresh, et limites de débit
+Dépendances: express, cors, helmet, ./utils/logger, ./routes/demo, ./routes/dao-simple
+Sécurité: veille à la validation d’entrée, gestion JWT/refresh
 Performance: cache/partitionnement/bundling optimisés
 */
 /**
