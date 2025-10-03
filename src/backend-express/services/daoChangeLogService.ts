@@ -82,14 +82,7 @@ class InMemoryDaoChangeLogService {
     const p = this.pending.get(dao.id);
     const createdAt = new Date().toISOString();
     if (!p || p.tasks.size === 0) {
-      return {
-        daoId: dao.id,
-        numeroListe: dao.numeroListe,
-        title: "Mise à jour DAO",
-        message: `Numéro de liste : ${dao.numeroListe}`,
-        lines: [`Numéro de liste : ${dao.numeroListe}`],
-        createdAt,
-      };
+      return null;
     }
 
     // Ordonner par taskId pour une sortie stable
@@ -142,6 +135,17 @@ class InMemoryDaoChangeLogService {
     arr.unshift(entry);
     this.historyByDay.set(key, arr.slice(0, 1000));
     return entry;
+  }
+
+  aggregateAndClear(
+    dao: Dao,
+    maxLines = 6,
+  ): { summary: DaoAggregatedSummary; history: DaoHistoryEntry } | null {
+    const summary = this.buildAggregatedSummary(dao, maxLines);
+    if (!summary) return null;
+    const history = this.finalizeAndStoreHistory(summary);
+    this.clearPending(dao.id);
+    return { summary, history };
   }
 
   listHistory(opts?: {
