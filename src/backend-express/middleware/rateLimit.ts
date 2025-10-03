@@ -15,9 +15,18 @@ interface SensitiveLimitOptions {
  * - Sends JSON 429 responses
  */
 export function sensitiveOperationLimit(options: SensitiveLimitOptions = {}): RequestHandler {
-  const windowMs = options.windowMs ?? 60_000; // 1 minute
-  const limit = (options.limit ?? options.max) ?? 5; // 5 requests/minute by default
+  // Env-configurable toggle and values
+  const enabledEnv = (process.env.SENSITIVE_LIMIT_ENABLED ?? process.env.SENSITIVE_OPS_RATE_LIMIT_ENABLED ?? "false").toLowerCase();
+  const enabled = enabledEnv === "true" || enabledEnv === "1";
+
+  const windowMs = Number(process.env.SENSITIVE_LIMIT_WINDOW_MS ?? options.windowMs ?? 60_000);
+  const limit = Number(process.env.SENSITIVE_LIMIT_MAX ?? options.limit ?? options.max ?? 0); // default 0 => disabled
   const message = options.message ?? "Trop de tentatives, réessayez plus tard";
+
+  // No-op when disabled or non-positive limits
+  if (!enabled || !isFinite(windowMs) || windowMs <= 0 || !isFinite(limit) || limit <= 0) {
+    return (_req: Request, _res: Response, next) => next();
+  }
 
   const limiter = rateLimit({
     windowMs,
