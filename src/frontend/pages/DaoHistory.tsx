@@ -342,40 +342,7 @@ export default function DaoHistory() {
                 </div>
                 <div className="space-y-3">
                   {entries.map((entry) => (
-                    <Card key={entry.id}>
-                      <CardHeader className="pb-3">
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                          <div>
-                            <CardTitle className="text-base sm:text-lg">
-                              {entry.summary}
-                            </CardTitle>
-                            <CardDescription className="text-xs sm:text-sm">
-                              {new Date(entry.createdAt).toLocaleTimeString(
-                                "fr-FR",
-                                { hour: "2-digit", minute: "2-digit" },
-                              )}{" "}
-                              • {entry.numeroListe}
-                            </CardDescription>
-                          </div>
-                          <Badge variant="secondary">
-                            {entry.daoId.slice(0, 6)}
-                          </Badge>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="space-y-2 pt-0">
-                        <Separator />
-                        <ul className="mt-3 space-y-1">
-                          {entry.lines.map((ln, idx) => (
-                            <li
-                              key={idx}
-                              className="text-sm whitespace-pre-line"
-                            >
-                              • {ln}
-                            </li>
-                          ))}
-                        </ul>
-                      </CardContent>
-                    </Card>
+                    <HistoryEventCard key={entry.id} entry={entry} />
                   ))}
                 </div>
               </div>
