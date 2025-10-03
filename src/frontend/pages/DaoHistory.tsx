@@ -35,9 +35,7 @@ export default function DaoHistory() {
 
   // Filtres
   const today = useMemo(() => new Date(), []);
-  const [mode, setMode] = useState<"day" | "month" | "year" | "range">(
-    "day",
-  );
+  const [mode, setMode] = useState<"day" | "month" | "year" | "range">("day");
   const [selectedDate, setSelectedDate] = useState<string>(yyyyMmDd(today));
   const [selectedMonth, setSelectedMonth] = useState<string>(
     String(today.getMonth() + 1),
@@ -98,7 +96,9 @@ export default function DaoHistory() {
       map.set(key, arr);
     }
     const entries = Array.from(map.entries());
-    entries.sort((a, b) => (sortDesc ? (a[0] < b[0] ? 1 : -1) : a[0] > b[0] ? 1 : -1));
+    entries.sort((a, b) =>
+      sortDesc ? (a[0] < b[0] ? 1 : -1) : a[0] > b[0] ? 1 : -1,
+    );
     return entries;
   }, [items, sortDesc]);
 
@@ -115,16 +115,28 @@ export default function DaoHistory() {
       <main className="container mx-auto px-4 sm:px-6 py-4 sm:py-6">
         <div className="flex items-center justify-between mb-4 sm:mb-6">
           <div>
-            <h2 className="text-lg sm:text-xl font-semibold">Historique des modifications</h2>
+            <h2 className="text-lg sm:text-xl font-semibold">
+              Historique des modifications
+            </h2>
             <p className="text-sm text-muted-foreground">
-              Journal des mises à jour de DAO et tâches, filtrable par jour/mois/année ou plage
+              Journal des mises à jour de DAO et tâches, filtrable par
+              jour/mois/année ou plage
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={load}
+              disabled={loading}
+            >
               Rafraîchir
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setSortDesc((v) => !v)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSortDesc((v) => !v)}
+            >
               {sortDesc ? "Tri: récents → anciens" : "Tri: anciens → récents"}
             </Button>
           </div>
@@ -137,7 +149,9 @@ export default function DaoHistory() {
               <div>
                 <label className="text-xs text-muted-foreground">Mode</label>
                 <Select value={mode} onValueChange={(v) => setMode(v as any)}>
-                  <SelectTrigger className="w-full"><SelectValue placeholder="Sélectionner" /></SelectTrigger>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Sélectionner" />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="day">Jour</SelectItem>
                     <SelectItem value="month">Mois</SelectItem>
@@ -150,30 +164,54 @@ export default function DaoHistory() {
               {mode === "day" && (
                 <div>
                   <label className="text-xs text-muted-foreground">Date</label>
-                  <Input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} />
+                  <Input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                  />
                 </div>
               )}
 
               {mode === "month" && (
                 <>
                   <div>
-                    <label className="text-xs text-muted-foreground">Mois</label>
-                    <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                      <SelectTrigger className="w-full"><SelectValue placeholder="Mois" /></SelectTrigger>
+                    <label className="text-xs text-muted-foreground">
+                      Mois
+                    </label>
+                    <Select
+                      value={selectedMonth}
+                      onValueChange={setSelectedMonth}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Mois" />
+                      </SelectTrigger>
                       <SelectContent>
-                        {Array.from({ length: 12 }, (_, i) => String(i + 1)).map((m) => (
-                          <SelectItem key={m} value={m}>{m.padStart(2, "0")}</SelectItem>
+                        {Array.from({ length: 12 }, (_, i) =>
+                          String(i + 1),
+                        ).map((m) => (
+                          <SelectItem key={m} value={m}>
+                            {m.padStart(2, "0")}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
                   <div>
-                    <label className="text-xs text-muted-foreground">Année</label>
-                    <Select value={selectedYear} onValueChange={setSelectedYear}>
-                      <SelectTrigger className="w-full"><SelectValue placeholder="Année" /></SelectTrigger>
+                    <label className="text-xs text-muted-foreground">
+                      Année
+                    </label>
+                    <Select
+                      value={selectedYear}
+                      onValueChange={setSelectedYear}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Année" />
+                      </SelectTrigger>
                       <SelectContent>
                         {years.map((y) => (
-                          <SelectItem key={y} value={y}>{y}</SelectItem>
+                          <SelectItem key={y} value={y}>
+                            {y}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -185,10 +223,14 @@ export default function DaoHistory() {
                 <div>
                   <label className="text-xs text-muted-foreground">Année</label>
                   <Select value={selectedYear} onValueChange={setSelectedYear}>
-                    <SelectTrigger className="w-full"><SelectValue placeholder="Année" /></SelectTrigger>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Année" />
+                    </SelectTrigger>
                     <SelectContent>
                       {years.map((y) => (
-                        <SelectItem key={y} value={y}>{y}</SelectItem>
+                        <SelectItem key={y} value={y}>
+                          {y}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -199,29 +241,55 @@ export default function DaoHistory() {
                 <>
                   <div>
                     <label className="text-xs text-muted-foreground">Du</label>
-                    <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+                    <Input
+                      type="date"
+                      value={dateFrom}
+                      onChange={(e) => setDateFrom(e.target.value)}
+                    />
                   </div>
                   <div>
                     <label className="text-xs text-muted-foreground">Au</label>
-                    <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+                    <Input
+                      type="date"
+                      value={dateTo}
+                      onChange={(e) => setDateTo(e.target.value)}
+                    />
                   </div>
                 </>
               )}
 
               <div className="flex items-end gap-2">
-                <Button variant="secondary" size="sm" onClick={() => {
-                  setMode("day");
-                  setSelectedDate(yyyyMmDd(new Date()));
-                }}>Aujourd'hui</Button>
-                <Button variant="outline" size="sm" onClick={() => {
-                  setMode("month");
-                  setSelectedMonth(String(new Date().getMonth() + 1));
-                  setSelectedYear(String(new Date().getFullYear()));
-                }}>Ce mois</Button>
-                <Button variant="outline" size="sm" onClick={() => {
-                  setMode("year");
-                  setSelectedYear(String(new Date().getFullYear()));
-                }}>Cette année</Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    setMode("day");
+                    setSelectedDate(yyyyMmDd(new Date()));
+                  }}
+                >
+                  Aujourd'hui
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setMode("month");
+                    setSelectedMonth(String(new Date().getMonth() + 1));
+                    setSelectedYear(String(new Date().getFullYear()));
+                  }}
+                >
+                  Ce mois
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setMode("year");
+                    setSelectedYear(String(new Date().getFullYear()));
+                  }}
+                >
+                  Cette année
+                </Button>
               </div>
             </div>
           </CardContent>
@@ -230,7 +298,9 @@ export default function DaoHistory() {
         {error && (
           <Card className="mb-4">
             <CardContent className="pt-6 text-red-600">
-              {error === "UNAUTHORIZED" ? "Accès non autorisé. Veuillez vous reconnecter." : error}
+              {error === "UNAUTHORIZED"
+                ? "Accès non autorisé. Veuillez vous reconnecter."
+                : error}
             </CardContent>
           </Card>
         )}
@@ -258,8 +328,12 @@ export default function DaoHistory() {
             {grouped.map(([day, entries]) => (
               <div key={day}>
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-semibold">{new Date(day + "T00:00:00").toLocaleDateString("fr-FR")}</h3>
-                  <Badge variant="secondary">{entries.length} élément{entries.length > 1 ? "s" : ""}</Badge>
+                  <h3 className="text-sm font-semibold">
+                    {new Date(day + "T00:00:00").toLocaleDateString("fr-FR")}
+                  </h3>
+                  <Badge variant="secondary">
+                    {entries.length} élément{entries.length > 1 ? "s" : ""}
+                  </Badge>
                 </div>
                 <div className="space-y-3">
                   {entries.map((entry) => (
@@ -267,19 +341,32 @@ export default function DaoHistory() {
                       <CardHeader className="pb-3">
                         <div className="flex items-center justify-between gap-3">
                           <div>
-                            <CardTitle className="text-base sm:text-lg">{entry.summary}</CardTitle>
+                            <CardTitle className="text-base sm:text-lg">
+                              {entry.summary}
+                            </CardTitle>
                             <CardDescription className="text-xs sm:text-sm">
-                              {new Date(entry.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} • {entry.numeroListe}
+                              {new Date(entry.createdAt).toLocaleTimeString(
+                                "fr-FR",
+                                { hour: "2-digit", minute: "2-digit" },
+                              )}{" "}
+                              • {entry.numeroListe}
                             </CardDescription>
                           </div>
-                          <Badge variant="secondary">{entry.daoId.slice(0, 6)}</Badge>
+                          <Badge variant="secondary">
+                            {entry.daoId.slice(0, 6)}
+                          </Badge>
                         </div>
                       </CardHeader>
                       <CardContent className="space-y-2 pt-0">
                         <Separator />
                         <ul className="mt-3 space-y-1">
                           {entry.lines.map((ln, idx) => (
-                            <li key={idx} className="text-sm whitespace-pre-line">• {ln}</li>
+                            <li
+                              key={idx}
+                              className="text-sm whitespace-pre-line"
+                            >
+                              • {ln}
+                            </li>
                           ))}
                         </ul>
                       </CardContent>

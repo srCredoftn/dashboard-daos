@@ -5,7 +5,13 @@ import { useState, useEffect, useCallback, useRef } from "react";
  * Perf: mises à jour optimistes, debounce des sauvegardes, import dynamique de jsPDF.
  */
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, FileText, Download, Edit3, CheckCircle2 } from "lucide-react";
+import {
+  ArrowLeft,
+  FileText,
+  Download,
+  Edit3,
+  CheckCircle2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -948,14 +954,23 @@ export default function DaoDetail() {
                         if (res?.summary) {
                           toast({
                             title: "Modifications validées",
-                            description: res.summary.lines.slice(0, 3).join("\n"),
+                            description: res.summary.lines
+                              .slice(0, 3)
+                              .join("\n"),
                           });
-                          try { await refreshNotifications(); } catch {}
+                          try {
+                            await refreshNotifications();
+                          } catch {}
                         } else if (res?.message) {
                           toast({ title: res.message });
                         }
                       } catch (e) {
-                        toast({ title: "Échec de validation", description: e instanceof Error ? e.message : String(e), variant: "destructive" });
+                        toast({
+                          title: "Échec de validation",
+                          description:
+                            e instanceof Error ? e.message : String(e),
+                          variant: "destructive",
+                        });
                       } finally {
                         setIsValidating(false);
                       }
@@ -964,7 +979,9 @@ export default function DaoDetail() {
                     className="px-3 h-8"
                   >
                     <CheckCircle2 className="h-4 w-4 mr-1" />
-                    <span className="text-sm">{isValidating ? "Validation…" : "Valider"}</span>
+                    <span className="text-sm">
+                      {isValidating ? "Validation…" : "Valider"}
+                    </span>
                   </Button>
                 )}
                 <ExportFilterDialog
@@ -1018,14 +1035,23 @@ export default function DaoDetail() {
                         if (res?.summary) {
                           toast({
                             title: "Modifications validées",
-                            description: res.summary.lines.slice(0, 3).join("\n"),
+                            description: res.summary.lines
+                              .slice(0, 3)
+                              .join("\n"),
                           });
-                          try { await refreshNotifications(); } catch {}
+                          try {
+                            await refreshNotifications();
+                          } catch {}
                         } else if (res?.message) {
                           toast({ title: res.message });
                         }
                       } catch (e) {
-                        toast({ title: "Échec de validation", description: e instanceof Error ? e.message : String(e), variant: "destructive" });
+                        toast({
+                          title: "Échec de validation",
+                          description:
+                            e instanceof Error ? e.message : String(e),
+                          variant: "destructive",
+                        });
                       } finally {
                         setIsValidating(false);
                       }
