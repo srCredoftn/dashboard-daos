@@ -312,7 +312,9 @@ router.post(
         const lines = splitMessageLines(t.message);
         const fallbackLines = lines.length
           ? lines
-          : [`DAO ${newDao.numeroListe} créé par ${req.user?.name || "un utilisateur"}`];
+          : [
+              `DAO ${newDao.numeroListe} créé par ${req.user?.name || "un utilisateur"}`,
+            ];
         DaoChangeLogService.recordEvent({
           dao: newDao,
           summary: t.title,
@@ -535,13 +537,11 @@ router.put(
       } catch (_) {}
 
       // Always broadcast a general DAO update, enregistrer l'historique et email all users
-      let historyPayload:
-        | {
-            summary: string;
-            lines: string[];
-            eventType: DaoHistoryEventType;
-          }
-        | null = null;
+      let historyPayload: {
+        summary: string;
+        lines: string[];
+        eventType: DaoHistoryEventType;
+      } | null = null;
       try {
         const hasTaskChanges = (res as any).hasTaskChanges === true;
 
@@ -946,7 +946,8 @@ router.put(
       } catch (_) {}
 
       // Broadcast task notification à tous les utilisateurs
-      let taskHistoryPayload: { summary: string; lines: string[] } | null = null;
+      let taskHistoryPayload: { summary: string; lines: string[] } | null =
+        null;
       try {
         const prevSet = new Set(previous.assignedTo || []);
         const currSet = new Set(task.assignedTo || []);

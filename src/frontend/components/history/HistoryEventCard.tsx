@@ -3,13 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import type { DaoHistoryEntry, DaoHistoryEventType } from "@shared/api";
 import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
-import {
-  Clock,
-  ListChecks,
-  PlusCircle,
-  RefreshCw,
-  Users,
-} from "lucide-react";
+import { Clock, ListChecks, PlusCircle, RefreshCw, Users } from "lucide-react";
 
 interface HistoryEventCardProps {
   entry: DaoHistoryEntry;
