@@ -27,8 +27,11 @@ import {
   tplDaoUpdated,
   tplDaoDeleted,
   tplTaskNotification,
+  tplDaoAggregatedUpdate,
+  tplLeaderChanged,
 } from "../services/notificationTemplates";
 import { daoStorage } from "../data/daoStorage";
+import { DaoChangeLogService } from "../services/daoChangeLogService";
 
 const router = express.Router();
 
@@ -439,8 +442,32 @@ router.put(
             else if (prev.role !== after.role)
               changed.push(`${after.name}: ${prev.role} → ${after.role}`);
           }
-          for (const [idKey, prev] of beforeMap) {
-            if (!afterMap.has(idKey)) changed.push(`${prev.name} retiré`);
+          for (const [_idKey, prev] of beforeMap) {
+            if (!afterMap.has(prev.id)) changed.push(`${prev.name} retiré`);
+          }
+
+          // Détection de changement de chef d'équipe
+          const oldLeader = before.equipe.find((m) => m.role === "chef_equipe");
+          const newLeader = updated.equipe.find(
+            (m) => m.role === "chef_equipe",
+          );
+          const leaderChanged =
+            (oldLeader?.id || null) !== (newLeader?.id || null);
+
+          if (leaderChanged) {
+            try {
+              DaoChangeLogService.recordLeaderChange(
+                updated,
+                oldLeader ? oldLeader.name : null,
+                newLeader ? newLeader.name : null,
+              );
+              const t = tplLeaderChanged({
+                dao: updated,
+                oldLeader: oldLeader?.name || null,
+                newLeader: newLeader?.name || null,
+              });
+              NotificationService.broadcast(t.type, t.title, t.message, t.data);
+            } catch (_) {}
           }
 
           if (changed.length > 0) {
@@ -453,8 +480,6 @@ router.put(
               changed.join(", "),
               { daoId: updated.id, changes: changed },
             );
-
-            // Email affected members when emails exist (handled elsewhere if needed)
           }
         }
 
@@ -862,7 +887,13 @@ router.put(
 
       const updated = await DaoService.updateDao(id, { tasks: dao.tasks });
 
-      // Broadcast task notification to all users
+      // Enregistrer pour agrégation (validation)
+      try {
+        const fullDao = await DaoService.getDaoById(id);
+        if (fullDao) DaoChangeLogService.recordTaskChange(fullDao, task);
+      } catch (_) {}
+
+      // Broadcast task notification à tous les utilisateurs
       try {
         const prevSet = new Set(previous.assignedTo || []);
         const currSet = new Set(task.assignedTo || []);
@@ -926,5 +957,79 @@ router.put(
     }
   },
 );
+
+// Validation agrégée: POST /api/dao/:id/validate
+router.post(
+  "/:id/validate",
+  authenticate,
+  auditLog("VALIDATE_DAO_CHANGES"),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      if (!id || id.length > 100) {
+        return void res.status(400).json({
+          error: "ID de DAO invalide",
+          code: "INVALID_DAO_ID",
+        });
+      }
+
+      const dao = await DaoService.getDaoById(id);
+      if (!dao) {
+        return void res.status(404).json({
+          error: "DAO introuvable",
+          code: "DAO_NOT_FOUND",
+        });
+      }
+
+      const summary = DaoChangeLogService.buildAggregatedSummary(dao, 6);
+      if (!summary) {
+        return void res
+          .status(200)
+          .json({ ok: true, message: "Aucune modification" });
+      }
+
+      try {
+        const t = tplDaoAggregatedUpdate({ dao, lines: summary.lines });
+        NotificationService.broadcast(t.type, t.title, t.message, t.data);
+      } catch (_) {}
+
+      // Historiser et nettoyer
+      const entry = DaoChangeLogService.finalizeAndStoreHistory(summary);
+      DaoChangeLogService.clearPending(dao.id);
+
+      return void res.json({ ok: true, summary, historyId: entry.id });
+    } catch (error) {
+      logger.error("Échec de validation des changements", "DAO_VALIDATE", {
+        message: String((error as Error)?.message),
+      });
+      return void res.status(500).json({
+        error: "Échec de validation des changements",
+        code: "VALIDATE_ERROR",
+      });
+    }
+  },
+);
+
+// Historique: GET /api/dao/history?date=YYYY-MM-DD&dateFrom=..&dateTo=..
+router.get("/history", authenticate, async (req, res) => {
+  try {
+    const date =
+      typeof req.query.date === "string" ? req.query.date : undefined;
+    const dateFrom =
+      typeof req.query.dateFrom === "string" ? req.query.dateFrom : undefined;
+    const dateTo =
+      typeof req.query.dateTo === "string" ? req.query.dateTo : undefined;
+    const list = DaoChangeLogService.listHistory({ date, dateFrom, dateTo });
+    return void res.json({ items: list });
+  } catch (error) {
+    logger.error("Échec de récupération de l'historique DAO", "DAO_HISTORY", {
+      message: String((error as Error)?.message),
+    });
+    return void res.status(500).json({
+      error: "Échec de récupération de l'historique",
+      code: "HISTORY_ERROR",
+    });
+  }
+});
 
 export default router;
