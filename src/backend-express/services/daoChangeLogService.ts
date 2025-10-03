@@ -31,26 +31,33 @@ class InMemoryDaoChangeLogService {
     const m = String(d.getMonth() + 1).padStart(2, "0");
     const dd = String(d.getDate()).padStart(2, "0");
     return `${y}-${m}-${dd}`;
-    }
+  }
 
   recordTaskChange(dao: Dao, task: DaoTask): void {
     const p = this.ensurePending(dao);
     const rec: PendingTaskChange = {
       taskId: task.id,
       isApplicable: task.isApplicable,
-      progress: task.isApplicable ? task.progress ?? 0 : null,
+      progress: task.isApplicable ? (task.progress ?? 0) : null,
       comment: task.comment,
     };
     p.tasks.set(task.id, rec);
     p.lastTouchedAt = new Date().toISOString();
   }
 
-  recordLeaderChange(dao: Dao, oldLeaderName: string | null, newLeaderName: string | null): void {
+  recordLeaderChange(
+    dao: Dao,
+    oldLeaderName: string | null,
+    newLeaderName: string | null,
+  ): void {
     // Pour l'agrégation « Mise à jour DAO », on n'ajoute pas de ligne spéciale pour le chef
     // car une notification dédiée est envoyée immédiatement. On marque tout de même l'activité.
     const p = this.ensurePending(dao);
     p.lastTouchedAt = new Date().toISOString();
-    logger.info(`Leader change enregistré pour ${dao.numeroListe}: ${oldLeaderName} -> ${newLeaderName}`, "DAO_CHANGELOG");
+    logger.info(
+      `Leader change enregistré pour ${dao.numeroListe}: ${oldLeaderName} -> ${newLeaderName}`,
+      "DAO_CHANGELOG",
+    );
   }
 
   clearPending(daoId: string): void {
@@ -86,7 +93,9 @@ class InMemoryDaoChangeLogService {
     }
 
     // Ordonner par taskId pour une sortie stable
-    const entries = Array.from(p.tasks.values()).sort((a, b) => a.taskId - b.taskId);
+    const entries = Array.from(p.tasks.values()).sort(
+      (a, b) => a.taskId - b.taskId,
+    );
     const lines: string[] = [];
     lines.push(`Numéro de liste : ${dao.numeroListe}`);
     let count = 0;
@@ -135,7 +144,11 @@ class InMemoryDaoChangeLogService {
     return entry;
   }
 
-  listHistory(opts?: { date?: string; dateFrom?: string; dateTo?: string }): DaoHistoryEntry[] {
+  listHistory(opts?: {
+    date?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  }): DaoHistoryEntry[] {
     // Si date fournie, retourner ce jour
     if (opts?.date) {
       return (this.historyByDay.get(opts.date) || []).slice();

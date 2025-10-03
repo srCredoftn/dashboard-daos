@@ -448,8 +448,11 @@ router.put(
 
           // Détection de changement de chef d'équipe
           const oldLeader = before.equipe.find((m) => m.role === "chef_equipe");
-          const newLeader = updated.equipe.find((m) => m.role === "chef_equipe");
-          const leaderChanged = (oldLeader?.id || null) !== (newLeader?.id || null);
+          const newLeader = updated.equipe.find(
+            (m) => m.role === "chef_equipe",
+          );
+          const leaderChanged =
+            (oldLeader?.id || null) !== (newLeader?.id || null);
 
           if (leaderChanged) {
             try {
@@ -1010,7 +1013,8 @@ router.post(
 // Historique: GET /api/dao/history?date=YYYY-MM-DD&dateFrom=..&dateTo=..
 router.get("/history", authenticate, async (req, res) => {
   try {
-    const date = typeof req.query.date === "string" ? req.query.date : undefined;
+    const date =
+      typeof req.query.date === "string" ? req.query.date : undefined;
     const dateFrom =
       typeof req.query.dateFrom === "string" ? req.query.dateFrom : undefined;
     const dateTo =
