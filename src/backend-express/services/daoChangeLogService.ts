@@ -154,19 +154,13 @@ class InMemoryDaoChangeLogService {
   }
 
   finalizeAndStoreHistory(summary: DaoAggregatedSummary): DaoHistoryEntry {
-    const entry: DaoHistoryEntry = {
-      id: `hist_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-      daoId: summary.daoId,
-      numeroListe: summary.numeroListe,
-      createdAt: summary.createdAt,
+    return this.recordEvent({
+      dao: { id: summary.daoId, numeroListe: summary.numeroListe },
       summary: summary.title,
       lines: summary.lines,
-    };
-    const key = this.dayKey(new Date(summary.createdAt));
-    const arr = this.historyByDay.get(key) || [];
-    arr.unshift(entry);
-    this.historyByDay.set(key, arr.slice(0, 1000));
-    return entry;
+      eventType: "dao_task_update",
+      createdAt: summary.createdAt,
+    });
   }
 
   aggregateAndClear(
