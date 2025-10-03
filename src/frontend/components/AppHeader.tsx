@@ -91,7 +91,12 @@ export function AppHeader({ title, children }: AppHeaderProps) {
         {/* Desktop and Mobile Header */}
         <div className="flex items-center justify-between">
           {/* Logo and Title */}
-          <div className="flex items-center space-x-3">
+          <button
+            type="button"
+            onClick={() => navigate("/")}
+            className="flex items-center space-x-3 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-opacity hover:opacity-80"
+            title="Aller à l'accueil"
+          >
             <img
               src="/logo.png"
               alt="2SND Technologies"
@@ -100,7 +105,7 @@ export function AppHeader({ title, children }: AppHeaderProps) {
             <h1 className="text-lg sm:text-xl font-bold">
               {title || "Gestion des DAO"}
             </h1>
-          </div>
+          </button>
 
           {/* Centre - Contenu personnalisé (Desktop uniquement) */}
           {children && (
@@ -111,14 +116,6 @@ export function AppHeader({ title, children }: AppHeaderProps) {
 
           {/* Right side - Always on one line */}
           <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate("/history")}
-            >
-              <Clock className="h-4 w-4" />
-              <span className="ml-2 hidden sm:inline">Historique</span>
-            </Button>
             <NotificationCenter />
             {user && (
               <>

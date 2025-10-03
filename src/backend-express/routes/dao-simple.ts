@@ -32,6 +32,7 @@ import {
 } from "../services/notificationTemplates";
 import { daoStorage } from "../data/daoStorage";
 import { DaoChangeLogService } from "../services/daoChangeLogService";
+import type { DaoHistoryEventType } from "@shared/api";
 
 const router = express.Router();
 
@@ -87,6 +88,13 @@ function sanitizeString(input: string): string {
     .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, "")
     .replace(/<[^>]+>/g, "")
     .trim();
+}
+
+function splitMessageLines(message: string): string[] {
+  return message
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
 }
 
 /**
@@ -297,10 +305,23 @@ router.post(
 
       logger.audit("DAO créé avec succès", req.user?.id, req.ip);
 
-      // Notifier la plateforme et envoyer un e-mail à tous les utilisateurs
+      // Notifier la plateforme et enregistrer l'historique
       try {
         const t = tplDaoCreated(newDao);
         NotificationService.broadcast(t.type, t.title, t.message, t.data);
+        const lines = splitMessageLines(t.message);
+        const fallbackLines = lines.length
+          ? lines
+          : [
+              `DAO ${newDao.numeroListe} créé par ${req.user?.name || "un utilisateur"}`,
+            ];
+        DaoChangeLogService.recordEvent({
+          dao: newDao,
+          summary: t.title,
+          lines: fallbackLines,
+          eventType: "dao_created",
+          createdAt: newDao.createdAt,
+        });
       } catch (_) {}
 
       res.status(201).json(newDao);
@@ -476,7 +497,7 @@ router.put(
 
             NotificationService.broadcast(
               "role_update",
-              "Modification de l'équipe",
+              "Modification de l'��quipe",
               changed.join(", "),
               { daoId: updated.id, changes: changed },
             );
@@ -515,7 +536,12 @@ router.put(
           (res as any).hasTaskChanges || hasTaskChanges;
       } catch (_) {}
 
-      // Always broadcast a general DAO update and email all users
+      // Always broadcast a general DAO update, enregistrer l'historique et email all users
+      let historyPayload: {
+        summary: string;
+        lines: string[];
+        eventType: DaoHistoryEventType;
+      } | null = null;
       try {
         const hasTaskChanges = (res as any).hasTaskChanges === true;
 
@@ -540,8 +566,34 @@ router.put(
         if (changedKeys.size > 0 || !hasTaskChanges) {
           const t = tplDaoUpdated(updated, changedKeys);
           NotificationService.broadcast(t.type, t.title, t.message, t.data);
+          historyPayload = {
+            summary: t.title,
+            lines: splitMessageLines(t.message),
+            eventType: "dao_updated",
+          };
+        } else if (hasTaskChanges) {
+          historyPayload = {
+            summary: "Mise à jour des tâches du DAO",
+            lines: [
+              `Le DAO ${updated.numeroListe} a reçu des mises à jour de tâches.`,
+              "Consultez le détail des tâches pour visualiser les changements.",
+            ],
+            eventType: "dao_task_update",
+          };
         }
       } catch (_) {}
+
+      if (historyPayload) {
+        try {
+          DaoChangeLogService.recordEvent({
+            dao: updated,
+            summary: historyPayload.summary,
+            lines: historyPayload.lines,
+            eventType: historyPayload.eventType,
+            createdAt: updated.updatedAt,
+          });
+        } catch (_) {}
+      }
 
       logger.audit("DAO mis à jour avec succès", req.user?.id, req.ip);
       res.json(updated);
@@ -894,6 +946,8 @@ router.put(
       } catch (_) {}
 
       // Broadcast task notification à tous les utilisateurs
+      let taskHistoryPayload: { summary: string; lines: string[] } | null =
+        null;
       try {
         const prevSet = new Set(previous.assignedTo || []);
         const currSet = new Set(task.assignedTo || []);
@@ -931,7 +985,23 @@ router.put(
           notif.message,
           notif.data,
         );
+        taskHistoryPayload = {
+          summary: notif.title,
+          lines: splitMessageLines(notif.message),
+        };
       } catch (_) {}
+
+      if (taskHistoryPayload) {
+        try {
+          DaoChangeLogService.recordEvent({
+            dao,
+            summary: taskHistoryPayload.summary,
+            lines: taskHistoryPayload.lines,
+            eventType: "dao_task_update",
+            createdAt: task.lastUpdatedAt || new Date().toISOString(),
+          });
+        } catch (_) {}
+      }
 
       logger.audit("Tâche mise à jour avec succès", req.user?.id, req.ip);
       res.json(updated);

@@ -6,7 +6,11 @@ Liens: utilisé par routes DAO/Tâches/Commentaires et endpoint de validation
 */
 import type { Dao, DaoTask } from "@shared/dao";
 import { logger } from "../utils/logger";
-import type { DaoAggregatedSummary, DaoHistoryEntry } from "@shared/api";
+import type {
+  DaoAggregatedSummary,
+  DaoHistoryEntry,
+  DaoHistoryEventType,
+} from "@shared/api";
 
 interface PendingTaskChange {
   taskId: number;
@@ -31,6 +35,34 @@ class InMemoryDaoChangeLogService {
     const m = String(d.getMonth() + 1).padStart(2, "0");
     const dd = String(d.getDate()).padStart(2, "0");
     return `${y}-${m}-${dd}`;
+  }
+
+  private pushEntry(entry: DaoHistoryEntry): DaoHistoryEntry {
+    const key = this.dayKey(new Date(entry.createdAt));
+    const arr = this.historyByDay.get(key) || [];
+    arr.unshift(entry);
+    this.historyByDay.set(key, arr.slice(0, 1000));
+    return entry;
+  }
+
+  recordEvent(params: {
+    dao: Pick<Dao, "id" | "numeroListe">;
+    summary: string;
+    lines: string[];
+    eventType: DaoHistoryEventType;
+    createdAt?: string;
+  }): DaoHistoryEntry {
+    const createdAt = params.createdAt || new Date().toISOString();
+    const entry: DaoHistoryEntry = {
+      id: `hist_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      daoId: params.dao.id,
+      numeroListe: params.dao.numeroListe,
+      createdAt,
+      summary: params.summary,
+      lines: params.lines,
+      eventType: params.eventType,
+    };
+    return this.pushEntry(entry);
   }
 
   recordTaskChange(dao: Dao, task: DaoTask): void {
@@ -122,19 +154,13 @@ class InMemoryDaoChangeLogService {
   }
 
   finalizeAndStoreHistory(summary: DaoAggregatedSummary): DaoHistoryEntry {
-    const entry: DaoHistoryEntry = {
-      id: `hist_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-      daoId: summary.daoId,
-      numeroListe: summary.numeroListe,
-      createdAt: summary.createdAt,
+    return this.recordEvent({
+      dao: { id: summary.daoId, numeroListe: summary.numeroListe },
       summary: summary.title,
       lines: summary.lines,
-    };
-    const key = this.dayKey(new Date(summary.createdAt));
-    const arr = this.historyByDay.get(key) || [];
-    arr.unshift(entry);
-    this.historyByDay.set(key, arr.slice(0, 1000));
-    return entry;
+      eventType: "dao_task_update",
+      createdAt: summary.createdAt,
+    });
   }
 
   aggregateAndClear(
