@@ -62,9 +62,6 @@ export function createServer(): express.Application {
     return runtimeBootId;
   }
 
-  // Faire confiance au proxy pour le rate limiting en développement
-  app.set("trust proxy", 1);
-
   // Middleware de sécurité
   app.use(
     helmet({
