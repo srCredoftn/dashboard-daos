@@ -76,7 +76,7 @@ const taskUpdateSchema = z.object({
 });
 
 /**
- * Nettoie une chaîne utilisateur:
+ * Nettoie une cha��ne utilisateur:
  * - retire balises <script>/<style>
  * - supprime toutes balises HTML restantes
  * - trim
@@ -442,8 +442,29 @@ router.put(
             else if (prev.role !== after.role)
               changed.push(`${after.name}: ${prev.role} → ${after.role}`);
           }
-          for (const [idKey, prev] of beforeMap) {
-            if (!afterMap.has(idKey)) changed.push(`${prev.name} retiré`);
+          for (const [_idKey, prev] of beforeMap) {
+            if (!afterMap.has(prev.id)) changed.push(`${prev.name} retiré`);
+          }
+
+          // Détection de changement de chef d'équipe
+          const oldLeader = before.equipe.find((m) => m.role === "chef_equipe");
+          const newLeader = updated.equipe.find((m) => m.role === "chef_equipe");
+          const leaderChanged = (oldLeader?.id || null) !== (newLeader?.id || null);
+
+          if (leaderChanged) {
+            try {
+              DaoChangeLogService.recordLeaderChange(
+                updated,
+                oldLeader ? oldLeader.name : null,
+                newLeader ? newLeader.name : null,
+              );
+              const t = tplLeaderChanged({
+                dao: updated,
+                oldLeader: oldLeader?.name || null,
+                newLeader: newLeader?.name || null,
+              });
+              NotificationService.broadcast(t.type, t.title, t.message, t.data);
+            } catch (_) {}
           }
 
           if (changed.length > 0) {
@@ -456,8 +477,6 @@ router.put(
               changed.join(", "),
               { daoId: updated.id, changes: changed },
             );
-
-            // Email affected members when emails exist (handled elsewhere if needed)
           }
         }
 
