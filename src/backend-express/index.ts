@@ -7,7 +7,7 @@ Sécurité: veille à la validation d’entrée, gestion JWT/refresh, et limites
 Performance: cache/partitionnement/bundling optimisés
 */
 /**
- * Express app: sécurité (helmet, rate-limit, CORS), routes API, boot/reset, logs, gestion d'erreurs.
+ * Express app: sécurité (helmet, CORS), routes API, boot/reset, logs, gestion d'erreurs.
  * Utilisé par server.ts pour démarrer le backend.
  */
 import "dotenv/config";
