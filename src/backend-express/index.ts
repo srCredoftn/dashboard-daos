@@ -78,19 +78,6 @@ export function createServer(): express.Application {
     }),
   );
 
-  // Limitation de débit
-  const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: process.env.NODE_ENV === "production" ? 100 : 1000, // More permissive in development
-    message: {
-      error: "Trop de requêtes depuis cette IP, veuillez réessayer plus tard.",
-      retryAfter: "15 minutes",
-    },
-    standardHeaders: true,
-    legacyHeaders: false,
-  });
-  app.use(limiter);
-
   // Limitation de débit spécifique à l'auth (adaptative selon l'environnement)
   const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
