@@ -946,6 +946,7 @@ router.put(
       } catch (_) {}
 
       // Broadcast task notification à tous les utilisateurs
+      let taskHistoryPayload: { summary: string; lines: string[] } | null = null;
       try {
         const prevSet = new Set(previous.assignedTo || []);
         const currSet = new Set(task.assignedTo || []);
@@ -983,7 +984,23 @@ router.put(
           notif.message,
           notif.data,
         );
+        taskHistoryPayload = {
+          summary: notif.title,
+          lines: splitMessageLines(notif.message),
+        };
       } catch (_) {}
+
+      if (taskHistoryPayload) {
+        try {
+          DaoChangeLogService.recordEvent({
+            dao,
+            summary: taskHistoryPayload.summary,
+            lines: taskHistoryPayload.lines,
+            eventType: "dao_task_update",
+            createdAt: task.lastUpdatedAt || new Date().toISOString(),
+          });
+        } catch (_) {}
+      }
 
       logger.audit("Tâche mise à jour avec succès", req.user?.id, req.ip);
       res.json(updated);
