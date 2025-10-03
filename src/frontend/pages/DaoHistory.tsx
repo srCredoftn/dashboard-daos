@@ -125,7 +125,7 @@ export default function DaoHistory() {
           </div>
           <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
             <Button
-              className="flex-1 sm:flex-none"
+              className="w-full sm:w-auto"
               variant="outline"
               size="sm"
               onClick={load}
@@ -134,7 +134,7 @@ export default function DaoHistory() {
               Rafraîchir
             </Button>
             <Button
-              className="flex-1 sm:flex-none"
+              className="w-full sm:w-auto"
               variant="outline"
               size="sm"
               onClick={() => setSortDesc((v) => !v)}
@@ -260,7 +260,7 @@ export default function DaoHistory() {
                 </>
               )}
 
-              <div className="flex flex-wrap gap-2 sm:col-span-2 lg:col-span-1">
+              <div className="flex flex-wrap gap-2 sm:col-span-2 sm:justify-end lg:col-span-1">
                 <Button
                   className="w-full sm:w-auto"
                   variant="secondary"
