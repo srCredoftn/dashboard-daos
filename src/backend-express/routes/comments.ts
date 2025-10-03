@@ -109,6 +109,10 @@ router.post("/", authenticate, async (req, res) => {
       if (dao) {
         const task = dao.tasks.find((t) => t.id === newComment.taskId);
         if (task) {
+          try {
+            const snapshot = { ...task, comment: newComment.content } as typeof task;
+            DaoChangeLogService.recordTaskChange(dao, snapshot);
+          } catch (_) {}
           const notif = tplTaskNotification({
             dao,
             previous: task,
