@@ -26,7 +26,10 @@ type HistoryResponse = {
 };
 
 class DaoHistoryApi {
-  private async request<T>(endpoint: string, options?: RequestOptions): Promise<T> {
+  private async request<T>(
+    endpoint: string,
+    options?: RequestOptions,
+  ): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`;
     const token = getToken();
 
@@ -132,11 +135,13 @@ class DaoHistoryApi {
     });
   }
 
-  async getHistory(params: {
-    date?: string;
-    dateFrom?: string;
-    dateTo?: string;
-  } = {}): Promise<DaoHistoryEntry[]> {
+  async getHistory(
+    params: {
+      date?: string;
+      dateFrom?: string;
+      dateTo?: string;
+    } = {},
+  ): Promise<DaoHistoryEntry[]> {
     const search = new URLSearchParams();
     if (params.date) search.set("date", params.date);
     if (params.dateFrom) search.set("dateFrom", params.dateFrom);

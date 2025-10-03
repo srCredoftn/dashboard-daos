@@ -104,13 +104,15 @@ router.post("/", authenticate, async (req, res) => {
 
     // Diffuser une notification à tous les utilisateurs + Bus de mail
     try {
-      
       const dao = await DaoService.getDaoById(newComment.daoId);
       if (dao) {
         const task = dao.tasks.find((t) => t.id === newComment.taskId);
         if (task) {
           try {
-            const snapshot = { ...task, comment: newComment.content } as typeof task;
+            const snapshot = {
+              ...task,
+              comment: newComment.content,
+            } as typeof task;
             DaoChangeLogService.recordTaskChange(dao, snapshot);
           } catch (_) {}
           const notif = tplTaskNotification({
@@ -163,13 +165,15 @@ router.put("/:id", authenticate, async (req, res) => {
 
     // Diffuser une notification à tous les utilisateurs + Bus de mail
     try {
-      
       const dao = await DaoService.getDaoById(updatedComment.daoId);
       if (dao) {
         const task = dao.tasks.find((t) => t.id === updatedComment.taskId);
         if (task) {
           try {
-            const snapshot = { ...task, comment: updatedComment.content } as typeof task;
+            const snapshot = {
+              ...task,
+              comment: updatedComment.content,
+            } as typeof task;
             DaoChangeLogService.recordTaskChange(dao, snapshot);
           } catch (_) {}
           const notif = tplTaskNotification({
@@ -227,7 +231,6 @@ router.delete("/:id", authenticate, async (req, res) => {
     // Diffuser une notification à tous les utilisateurs + Bus de mail
     if (comment) {
       try {
-        
         const dao = await DaoService.getDaoById(comment.daoId);
         if (dao) {
           const task = dao.tasks.find((t) => t.id === comment.taskId);
