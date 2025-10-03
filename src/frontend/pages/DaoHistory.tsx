@@ -113,8 +113,8 @@ export default function DaoHistory() {
       <AppHeader />
 
       <main className="container mx-auto px-4 sm:px-6 py-4 sm:py-6">
-        <div className="flex items-center justify-between mb-4 sm:mb-6">
-          <div>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-4 sm:mb-6">
+          <div className="space-y-2">
             <h2 className="text-lg sm:text-xl font-semibold">
               Historique des modifications
             </h2>
@@ -123,8 +123,9 @@ export default function DaoHistory() {
               jour/mois/année ou plage
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
             <Button
+              className="flex-1 sm:flex-none"
               variant="outline"
               size="sm"
               onClick={load}
@@ -133,6 +134,7 @@ export default function DaoHistory() {
               Rafraîchir
             </Button>
             <Button
+              className="flex-1 sm:flex-none"
               variant="outline"
               size="sm"
               onClick={() => setSortDesc((v) => !v)}
@@ -145,7 +147,7 @@ export default function DaoHistory() {
         {/* Barre de filtres */}
         <Card className="mb-4">
           <CardContent className="pt-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div>
                 <label className="text-xs text-muted-foreground">Mode</label>
                 <Select value={mode} onValueChange={(v) => setMode(v as any)}>
@@ -258,8 +260,9 @@ export default function DaoHistory() {
                 </>
               )}
 
-              <div className="flex items-end gap-2">
+              <div className="flex flex-wrap gap-2 sm:col-span-2 lg:col-span-1">
                 <Button
+                  className="w-full sm:w-auto"
                   variant="secondary"
                   size="sm"
                   onClick={() => {
@@ -270,6 +273,7 @@ export default function DaoHistory() {
                   Aujourd'hui
                 </Button>
                 <Button
+                  className="w-full sm:w-auto"
                   variant="outline"
                   size="sm"
                   onClick={() => {
@@ -281,6 +285,7 @@ export default function DaoHistory() {
                   Ce mois
                 </Button>
                 <Button
+                  className="w-full sm:w-auto"
                   variant="outline"
                   size="sm"
                   onClick={() => {
@@ -327,7 +332,7 @@ export default function DaoHistory() {
           <div className="space-y-6">
             {grouped.map(([day, entries]) => (
               <div key={day}>
-                <div className="flex items-center justify-between mb-2">
+                <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <h3 className="text-sm font-semibold">
                     {new Date(day + "T00:00:00").toLocaleDateString("fr-FR")}
                   </h3>
@@ -339,7 +344,7 @@ export default function DaoHistory() {
                   {entries.map((entry) => (
                     <Card key={entry.id}>
                       <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between gap-3">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                           <div>
                             <CardTitle className="text-base sm:text-lg">
                               {entry.summary}
