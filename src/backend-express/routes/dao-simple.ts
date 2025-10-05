@@ -26,6 +26,7 @@ import {
   tplDaoUpdated,
   tplDaoDeleted,
   tplTaskNotification,
+  tplDaoAggregatedUpdate,
   tplLeaderChanged,
 } from "../services/notificationTemplates";
 import { daoStorage } from "../data/daoStorage";
@@ -484,7 +485,11 @@ router.put(
                 oldLeader: oldLeader?.name || null,
                 newLeader: newLeader?.name || null,
               });
-              NotificationService.broadcast(t.type, t.title, t.message, t.data);
+              // Notification en app uniquement (pas d'email automatique hors validation)
+              NotificationService.broadcast(t.type, t.title, t.message, {
+                ...t.data,
+                skipEmailMirror: true,
+              });
             } catch (_) {}
           }
 
@@ -492,11 +497,12 @@ router.put(
             // Flag team change for later template rendering
             (res as any).teamChanged = true;
 
+            // Notification en app uniquement (pas d'email automatique hors validation)
             NotificationService.broadcast(
               "role_update",
-              "Modification de l'��quipe",
+              "Modification de l'équipe",
               changed.join(", "),
-              { daoId: updated.id, changes: changed },
+              { daoId: updated.id, changes: changed, skipEmailMirror: true },
             );
           }
         }
@@ -976,11 +982,12 @@ router.put(
           comment: previous.comment !== task.comment ? task.comment : undefined,
         });
 
+        // Notification en app uniquement (email envoyé à la validation)
         NotificationService.broadcast(
           notif.type,
           notif.title,
           notif.message,
-          notif.data,
+          { ...(notif.data || {}), skipEmailMirror: true },
         );
         taskHistoryPayload = {
           summary: notif.title,
@@ -1058,7 +1065,10 @@ router.post(
       const { summary, history } = aggregated;
 
       try {
-        // Utiliser une notification de type "tâche" pour l'email mirroring afin d'éviter les "Mise à jour DAO"
+        // 1) Diffuser "Mise à jour DAO" (email à tous)
+        const t = tplDaoAggregatedUpdate({ dao, lines: summary.lines });
+        NotificationService.broadcast(t.type, t.title, t.message, t.data);
+        // 2) Diffuser aussi une notification de type tâche (email à tous)
         NotificationService.broadcast(
           "task_notification",
           "Mise à jour d’une tâche",
