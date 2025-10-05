@@ -197,6 +197,33 @@ export default function DaoDetail() {
   );
   const canValidate = isTeamLead || isAdmin();
 
+  const handleValidateClick = async () => {
+    if (!dao || isValidating) return;
+    setIsValidating(true);
+    try {
+      const res = await daoHistoryApi.validateDao(dao.id);
+      if (res?.summary) {
+        toast({
+          title: "Modifications validées",
+          description: res.summary.lines.slice(0, 3).join("\n"),
+        });
+        try {
+          await refreshNotifications();
+        } catch {}
+      } else if (res?.message) {
+        toast({ title: res.message });
+      }
+    } catch (e) {
+      toast({
+        title: "Échec de validation",
+        description: e instanceof Error ? e.message : String(e),
+        variant: "destructive",
+      });
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
   /**
    * Gestion des mises à jour de tâche (progress, commentaire, applicabilité, assignations)
    * - Mises à jour optimistes locales
@@ -976,7 +1003,7 @@ export default function DaoDetail() {
                       }
                     }}
                     disabled={isValidating}
-                    className="px-3 h-8"
+                    className="px-3 h-8 hidden"
                   >
                     <CheckCircle2 className="h-4 w-4 mr-1" />
                     <span className="text-sm">
@@ -1057,6 +1084,7 @@ export default function DaoDetail() {
                       }
                     }}
                     disabled={isValidating}
+                    className="hidden"
                   >
                     <CheckCircle2 className="h-4 w-4 mr-2" />
                     {isValidating ? "Validation…" : "Valider"}
@@ -1358,15 +1386,40 @@ export default function DaoDetail() {
           </CardContent>
         </Card>
 
-        {isAdmin() && isLastDao && (
-          <div className="mt-8 flex justify-center">
-            <DeleteLastDaoButton
-              hasDaos={true}
-              onDeleted={() => {
-                navigate("/");
-              }}
-            />
+        {isLastDao ? (
+          <div className="mt-8 flex justify-end">
+            <div className="flex items-center gap-2">
+              {canValidate && (
+                <Button
+                  size="sm"
+                  onClick={handleValidateClick}
+                  disabled={isValidating}
+                >
+                  {isValidating ? "Validation…" : "Valider"}
+                </Button>
+              )}
+              {isAdmin() && (
+                <DeleteLastDaoButton
+                  hasDaos={true}
+                  onDeleted={() => {
+                    navigate("/");
+                  }}
+                />
+              )}
+            </div>
           </div>
+        ) : (
+          canValidate && (
+            <div className="mt-8 flex justify-center">
+              <Button
+                size="sm"
+                onClick={handleValidateClick}
+                disabled={isValidating}
+              >
+                {isValidating ? "Validation…" : "Valider"}
+              </Button>
+            </div>
+          )
         )}
       </main>
     </div>
