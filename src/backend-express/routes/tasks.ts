@@ -121,7 +121,7 @@ router.post(
             "task_notification",
             "Nouvelle tâche",
             tAll.body,
-            { daoId: daoFull.id, taskId: newTask.id, skipEmailMirror: true }
+            { daoId: daoFull.id, taskId: newTask.id }
           );
 
           for (const mId of newTask.assignedTo || []) {
@@ -138,7 +138,7 @@ router.post(
                 "task_notification",
                 "Assignation de tâche",
                 t.body,
-                { daoId: daoFull.id, taskId: newTask.id, skipEmailMirror: true }
+                { daoId: daoFull.id, taskId: newTask.id }
               );
             }
           }
@@ -251,12 +251,12 @@ router.put(
               `Mis à jour par : ${req.user?.email || req.user?.id || "inconnu"}`,
             ],
           };
-          // Notification en app uniquement (email envoyé lors de la validation)
+          // Notification + email immédiat
           NotificationService.broadcast(
             "task_notification",
             "Mise à jour d’une tâche",
             t.body,
-            { daoId: dao.id, taskId: task.id, skipEmailMirror: true }
+            { daoId: dao.id, taskId: task.id }
           );
         }
       } catch (_) {}
