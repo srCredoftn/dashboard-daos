@@ -171,12 +171,7 @@ export async function sendEmail(
   const smtpSubject = (subject && subject.trim()) || "Gestion des DAOs 2SND";
   const html = buildEmailHtml(smtpSubject, body || "");
 
-  // Paramètres de lot et délai (configurables via env)
-  const BATCH_SIZE = Math.max(1, Number(process.env.SMTP_BATCH_SIZE || 25));
-  const BATCH_DELAY_MS = Math.max(
-    0,
-    Number(process.env.SMTP_BATCH_DELAY_MS || 800),
-  );
+  // Envoi sans limitation: pas de batch ni délai
 
   const transport = await getTransport();
   if (transport) {
@@ -187,53 +182,43 @@ export async function sendEmail(
         "no-reply@example.com";
       const from = `"Gestion des DAOs 2SND" <${fromAddress}>`;
 
-      // Envoi par paquets via BCC pour limiter les rejets (554, etc.)
-      let successCount = 0;
-      for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
-        const batch = recipients.slice(i, i + BATCH_SIZE);
-        try {
-          await transport.sendMail({
-            from,
-            to: fromAddress,
-            bcc: batch.join(", "),
-            subject: smtpSubject,
-            text: body || "",
-            html,
-          });
-          successCount += batch.length;
-          emailEvents.unshift({
-            ts: new Date().toISOString(),
-            subject: smtpSubject,
-            toCount: batch.length,
-            success: true,
-          });
-        } catch (e) {
-          const err: any = e;
-          const code = err?.responseCode || err?.code || "unknown";
-          const msg = String((e as Error)?.message || e);
-          lastTransportError = msg;
-          logger.error("Échec envoi SMTP (batch)", "MAIL", {
-            message: msg,
-            code,
-            batchSize: batch.length,
-          });
-          emailEvents.unshift({
-            ts: new Date().toISOString(),
-            subject: smtpSubject,
-            toCount: batch.length,
-            success: false,
-            error: `${code}: ${msg}`,
-          });
-        }
-        if (i + BATCH_SIZE < recipients.length && BATCH_DELAY_MS > 0) {
-          await new Promise((r) => setTimeout(r, BATCH_DELAY_MS));
-        }
+      // Envoi unique avec BCC de tous les destinataires
+      try {
+        await transport.sendMail({
+          from,
+          to: fromAddress,
+          bcc: recipients.join(", "),
+          subject: smtpSubject,
+          text: body || "",
+          html,
+        });
+        emailEvents.unshift({
+          ts: new Date().toISOString(),
+          subject: smtpSubject,
+          toCount: recipients.length,
+          success: true,
+        });
+        if (emailEvents.length > 50) emailEvents.length = 50;
+        return;
+      } catch (e) {
+        const err: any = e;
+        const code = err?.responseCode || err?.code || "unknown";
+        const msg = String((e as Error)?.message || e);
+        lastTransportError = msg;
+        logger.error("Échec envoi SMTP", "MAIL", {
+          message: msg,
+          code,
+          batchSize: recipients.length,
+        });
+        emailEvents.unshift({
+          ts: new Date().toISOString(),
+          subject: smtpSubject,
+          toCount: recipients.length,
+          success: false,
+          error: `${code}: ${msg}`,
+        });
+        if (emailEvents.length > 50) emailEvents.length = 50;
       }
-      if (emailEvents.length > 50) emailEvents.length = 50;
-      if (successCount === 0) {
-        throw new Error(lastTransportError || "SMTP send failed");
-      }
-      return;
     } catch (e) {
       const err: any = e;
       const code = err?.responseCode || err?.code || "unknown";
