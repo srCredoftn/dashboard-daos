@@ -11,6 +11,7 @@ import type {
   DaoHistoryEntry,
   DaoHistoryEventType,
 } from "@shared/api";
+import { tplDaoUpdated } from "./notificationTemplates";
 
 interface PendingTaskChange {
   taskId: number;
