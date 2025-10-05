@@ -69,7 +69,7 @@ export default function DeleteLastDaoButton({
         <Button
           variant="destructive"
           size="sm"
-          className="w-full xs:w-auto lg:w-28"
+          className="w-full xs:w-auto lg:w-28 opacity-60 saturate-0 hover:opacity-100 hover:saturate-100 transition-colors"
           disabled={disabled || processing || !hasDaos}
           onClick={() => setOpen(true)}
         >
