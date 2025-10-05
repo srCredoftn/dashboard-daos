@@ -98,6 +98,13 @@ class InMemoryDaoChangeLogService {
     this.pending.delete(daoId);
   }
 
+  recordDaoChanged(dao: Dao, changedKeys: Set<string>): void {
+    const p = this.ensurePending(dao);
+    if (!p.daoChangedKeys) p.daoChangedKeys = new Set<string>();
+    for (const k of changedKeys) p.daoChangedKeys.add(k);
+    p.lastTouchedAt = new Date().toISOString();
+  }
+
   private ensurePending(dao: Dao): PendingByDao {
     let p = this.pending.get(dao.id);
     if (!p) {
