@@ -518,20 +518,55 @@ router.put(
               if (aa[i] !== bb[i]) return false;
             return true;
           };
+
+          const taskChanges: Array<{
+            prev: any;
+            curr: any;
+            changeType:
+              | "progress"
+              | "applicability"
+              | "assignees"
+              | "comment"
+              | "general";
+          }> = [];
+
           for (const t of updated.tasks) {
             const prev = byIdBefore.get(t.id);
             if (!prev) continue;
             const p1 = prev.progress ?? 0;
             const p2 = t.progress ?? 0;
-            if (
-              prev.isApplicable !== t.isApplicable ||
-              (p1 !== p2 && t.isApplicable) ||
-              prev.comment !== t.comment ||
-              !sameArray(prev.assignedTo, t.assignedTo)
-            ) {
-              hasTaskChanges = true; // will trigger a generic DAO update notice later
+            if (prev.isApplicable !== t.isApplicable) {
+              hasTaskChanges = true;
+              taskChanges.push({ prev, curr: t, changeType: "applicability" });
+              continue;
+            }
+            if (p1 !== p2 && t.isApplicable) {
+              hasTaskChanges = true;
+              taskChanges.push({ prev, curr: t, changeType: "progress" });
+            }
+            if (prev.comment !== t.comment) {
+              hasTaskChanges = true;
+              taskChanges.push({ prev, curr: t, changeType: "comment" });
+            }
+            if (!sameArray(prev.assignedTo, t.assignedTo)) {
+              hasTaskChanges = true;
+              taskChanges.push({ prev, curr: t, changeType: "assignees" });
             }
           }
+
+          // Diffuser un email pour chaque changement significatif de tâche
+          try {
+            for (const c of taskChanges) {
+              const t = tplTaskNotification({
+                dao: updated,
+                previous: c.prev,
+                current: c.curr,
+                changeType: c.changeType,
+                comment: c.curr.comment,
+              });
+              NotificationService.broadcast(t.type, t.title, t.message, t.data);
+            }
+          } catch (_) {}
         }
 
         // Mark on res.locals to inform later step whether to broadcast generic update
@@ -1081,7 +1116,7 @@ router.post(
             "task_notification",
             "Mise à jour d’une tâche",
             summary.lines.join("\n"),
-            { event: "task_validation", daoId: dao.id }
+            { event: "task_validation", daoId: dao.id },
           );
         } else {
           // top-level DAO changes

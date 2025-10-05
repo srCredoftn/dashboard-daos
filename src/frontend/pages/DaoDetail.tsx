@@ -11,6 +11,7 @@ import {
   Download,
   Edit3,
   CheckCircle2,
+  Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -196,6 +197,33 @@ export default function DaoDetail() {
     (m) => m.id === user?.id && m.role === "chef_equipe",
   );
   const canValidate = isTeamLead || isAdmin();
+
+  const handleValidateClick = async () => {
+    if (!dao || isValidating) return;
+    setIsValidating(true);
+    try {
+      const res = await daoHistoryApi.validateDao(dao.id);
+      if (res?.summary) {
+        toast({
+          title: "Modifications validées",
+          description: res.summary.lines.slice(0, 3).join("\n"),
+        });
+        try {
+          await refreshNotifications();
+        } catch {}
+      } else if (res?.message) {
+        toast({ title: res.message });
+      }
+    } catch (e) {
+      toast({
+        title: "Échec de validation",
+        description: e instanceof Error ? e.message : String(e),
+        variant: "destructive",
+      });
+    } finally {
+      setIsValidating(false);
+    }
+  };
 
   /**
    * Gestion des mises à jour de tâche (progress, commentaire, applicabilité, assignations)
@@ -976,7 +1004,7 @@ export default function DaoDetail() {
                       }
                     }}
                     disabled={isValidating}
-                    className="px-3 h-8"
+                    className="px-3 h-8 hidden"
                   >
                     <CheckCircle2 className="h-4 w-4 mr-1" />
                     <span className="text-sm">
@@ -1057,6 +1085,7 @@ export default function DaoDetail() {
                       }
                     }}
                     disabled={isValidating}
+                    className="hidden"
                   >
                     <CheckCircle2 className="h-4 w-4 mr-2" />
                     {isValidating ? "Validation…" : "Valider"}
@@ -1358,15 +1387,44 @@ export default function DaoDetail() {
           </CardContent>
         </Card>
 
-        {isAdmin() && isLastDao && (
+        {isLastDao ? (
           <div className="mt-8 flex justify-center">
-            <DeleteLastDaoButton
-              hasDaos={true}
-              onDeleted={() => {
-                navigate("/");
-              }}
-            />
+            <div className="flex items-center gap-2">
+              {isAdmin() && (
+                <DeleteLastDaoButton
+                  hasDaos={true}
+                  onDeleted={() => {
+                    navigate("/");
+                  }}
+                />
+              )}
+              {canValidate && (
+                <Button
+                  size="sm"
+                  className="w-36"
+                  onClick={handleValidateClick}
+                  disabled={isValidating}
+                >
+                  <Check className="h-4 w-4 mr-1" />
+                  {isValidating ? "Validation…" : "Valider"}
+                </Button>
+              )}
+            </div>
           </div>
+        ) : (
+          canValidate && (
+            <div className="mt-8 flex justify-center">
+              <Button
+                size="sm"
+                className="w-36"
+                onClick={handleValidateClick}
+                disabled={isValidating}
+              >
+                <Check className="h-4 w-4 mr-1" />
+                {isValidating ? "Validation…" : "Valider"}
+              </Button>
+            </div>
+          )
         )}
       </main>
     </div>

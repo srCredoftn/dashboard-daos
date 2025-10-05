@@ -69,11 +69,11 @@ export default function DeleteLastDaoButton({
         <Button
           variant="destructive"
           size="sm"
-          className="w-full xs:w-auto lg:w-28"
+          className="w-36"
           disabled={disabled || processing || !hasDaos}
           onClick={() => setOpen(true)}
         >
-          <Trash2 className="h-4 w-4 mr-2" />
+          <Trash2 className="h-4 w-4 mr-1" />
           Supprimer
         </Button>
       }
