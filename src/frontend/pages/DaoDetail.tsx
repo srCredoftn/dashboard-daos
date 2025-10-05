@@ -11,6 +11,7 @@ import {
   Download,
   Edit3,
   CheckCircle2,
+  Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -1387,17 +1388,8 @@ export default function DaoDetail() {
         </Card>
 
         {isLastDao ? (
-          <div className="mt-8 flex justify-end">
+          <div className="mt-8 flex justify-center">
             <div className="flex items-center gap-2">
-              {canValidate && (
-                <Button
-                  size="sm"
-                  onClick={handleValidateClick}
-                  disabled={isValidating}
-                >
-                  {isValidating ? "Validation…" : "Valider"}
-                </Button>
-              )}
               {isAdmin() && (
                 <DeleteLastDaoButton
                   hasDaos={true}
@@ -1405,6 +1397,16 @@ export default function DaoDetail() {
                     navigate("/");
                   }}
                 />
+              )}
+              {canValidate && (
+                <Button
+                  size="sm"
+                  onClick={handleValidateClick}
+                  disabled={isValidating}
+                >
+                  <Check className="h-4 w-4 mr-2" />
+                  {isValidating ? "Validation…" : "Valider"}
+                </Button>
               )}
             </div>
           </div>
@@ -1416,6 +1418,7 @@ export default function DaoDetail() {
                 onClick={handleValidateClick}
                 disabled={isValidating}
               >
+                <Check className="h-4 w-4 mr-2" />
                 {isValidating ? "Validation…" : "Valider"}
               </Button>
             </div>
