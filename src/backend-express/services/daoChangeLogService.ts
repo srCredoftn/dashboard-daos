@@ -105,6 +105,7 @@ class InMemoryDaoChangeLogService {
         daoId: dao.id,
         numeroListe: dao.numeroListe,
         tasks: new Map<number, PendingTaskChange>(),
+        daoChangedKeys: new Set<string>(),
         lastTouchedAt: new Date().toISOString(),
       };
       this.pending.set(dao.id, p);
