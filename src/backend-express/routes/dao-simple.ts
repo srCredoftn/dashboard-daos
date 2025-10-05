@@ -514,14 +514,20 @@ router.put(
             const aa = [...(a || [])].sort();
             const bb = [...(b || [])].sort();
             if (aa.length !== bb.length) return false;
-            for (let i = 0; i < aa.length; i++) if (aa[i] !== bb[i]) return false;
+            for (let i = 0; i < aa.length; i++)
+              if (aa[i] !== bb[i]) return false;
             return true;
           };
 
           const taskChanges: Array<{
             prev: any;
             curr: any;
-            changeType: "progress" | "applicability" | "assignees" | "comment" | "general";
+            changeType:
+              | "progress"
+              | "applicability"
+              | "assignees"
+              | "comment"
+              | "general";
           }> = [];
 
           for (const t of updated.tasks) {
@@ -558,12 +564,7 @@ router.put(
                 changeType: c.changeType,
                 comment: c.curr.comment,
               });
-              NotificationService.broadcast(
-                t.type,
-                t.title,
-                t.message,
-                t.data,
-              );
+              NotificationService.broadcast(t.type, t.title, t.message, t.data);
             }
           } catch (_) {}
         }
@@ -1115,7 +1116,7 @@ router.post(
             "task_notification",
             "Mise à jour d’une tâche",
             summary.lines.join("\n"),
-            { event: "task_validation", daoId: dao.id }
+            { event: "task_validation", daoId: dao.id },
           );
         } else {
           // top-level DAO changes
