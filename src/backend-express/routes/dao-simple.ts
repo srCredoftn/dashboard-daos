@@ -26,13 +26,11 @@ import {
   tplDaoUpdated,
   tplDaoDeleted,
   tplTaskNotification,
-  tplDaoAggregatedUpdate,
   tplLeaderChanged,
 } from "../services/notificationTemplates";
 import { daoStorage } from "../data/daoStorage";
 import { DaoChangeLogService } from "../services/daoChangeLogService";
 import type { DaoHistoryEventType } from "@shared/api";
-import { sensitiveOperationLimit } from "../middleware/rateLimit";
 
 const router = express.Router();
 
@@ -227,7 +225,6 @@ router.post(
   authenticate,
   requireAdmin,
   auditLog("CREATE_DAO"),
-  sensitiveOperationLimit(),
   async (req, res) => {
     try {
       // Nettoyer les entrées expirées
@@ -565,7 +562,7 @@ router.put(
 
         if (changedKeys.size > 0 || !hasTaskChanges) {
           const t = tplDaoUpdated(updated, changedKeys);
-          NotificationService.broadcast(t.type, t.title, t.message, t.data);
+          // Ne plus diffuser de notification "Mise à jour DAO" ; conserver uniquement l'historique
           historyPayload = {
             summary: t.title,
             lines: splitMessageLines(t.message),
@@ -1061,8 +1058,13 @@ router.post(
       const { summary, history } = aggregated;
 
       try {
-        const t = tplDaoAggregatedUpdate({ dao, lines: summary.lines });
-        NotificationService.broadcast(t.type, t.title, t.message, t.data);
+        // Utiliser une notification de type "tâche" pour l'email mirroring afin d'éviter les "Mise à jour DAO"
+        NotificationService.broadcast(
+          "task_notification",
+          "Mise à jour d’une tâche",
+          summary.lines.join("\n"),
+          { event: "task_validation", daoId: dao.id }
+        );
       } catch (_) {}
 
       return void res.json({ ok: true, summary, historyId: history.id });
