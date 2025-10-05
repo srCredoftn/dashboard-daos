@@ -14,7 +14,8 @@ import { getIdempotency, setIdempotency } from "../utils/idempotency";
 import type { DaoTask } from "@shared/dao";
 import { DaoService } from "../services/daoService";
 import { DaoChangeLogService } from "../services/daoChangeLogService";
-import { Templates, emailAllUsers, sendEmail } from "../services/txEmail";
+import { Templates } from "../services/txEmail";
+import { NotificationService } from "../services/notificationService";
 import { logger } from "../utils/logger";
 
 const router = express.Router();
@@ -111,15 +112,21 @@ router.post(
 
       logger.audit("Task created", req.user?.id, req.ip);
 
-      // E-mails
+      // Notifications en app (pas d'e-mails hors validation)
       try {
         const daoFull = await DaoService.getDaoById(daoId);
         if (daoFull) {
           const tAll = Templates.task.created({ dao: daoFull, task: newTask });
-          await emailAllUsers(tAll.subject, tAll.body, "TASK_CREATED");
+          NotificationService.broadcast(
+            "task_notification",
+            "Nouvelle tâche",
+            tAll.body,
+            { daoId: daoFull.id, taskId: newTask.id }
+          );
+
           for (const mId of newTask.assignedTo || []) {
             const m = daoFull.equipe.find((x) => x.id === mId);
-            if (m?.email) {
+            if (m) {
               const t = Templates.task.updated({
                 dao: daoFull,
                 previous: newTask,
@@ -127,7 +134,12 @@ router.post(
                 action: "Assignation",
                 assignedToName: m.name,
               });
-              await sendEmail(m.email, t.subject, t.body, "TASK_ASSIGNED");
+              NotificationService.broadcast(
+                "task_notification",
+                "Assignation de tâche",
+                t.body,
+                { daoId: daoFull.id, taskId: newTask.id }
+              );
             }
           }
         }
@@ -239,7 +251,13 @@ router.put(
               `Mis à jour par : ${req.user?.email || req.user?.id || "inconnu"}`,
             ],
           };
-          await emailAllUsers(t.subject, t.body, "TASK_UPDATED");
+          // Notification + email immédiat
+          NotificationService.broadcast(
+            "task_notification",
+            "Mise à jour d’une tâche",
+            t.body,
+            { daoId: dao.id, taskId: task.id }
+          );
         }
       } catch (_) {}
 

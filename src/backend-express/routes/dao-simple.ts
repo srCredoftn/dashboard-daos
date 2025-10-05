@@ -32,7 +32,6 @@ import {
 import { daoStorage } from "../data/daoStorage";
 import { DaoChangeLogService } from "../services/daoChangeLogService";
 import type { DaoHistoryEventType } from "@shared/api";
-import { sensitiveOperationLimit } from "../middleware/rateLimit";
 
 const router = express.Router();
 
@@ -227,7 +226,6 @@ router.post(
   authenticate,
   requireAdmin,
   auditLog("CREATE_DAO"),
-  sensitiveOperationLimit(),
   async (req, res) => {
     try {
       // Nettoyer les entrées expirées
@@ -487,7 +485,11 @@ router.put(
                 oldLeader: oldLeader?.name || null,
                 newLeader: newLeader?.name || null,
               });
-              NotificationService.broadcast(t.type, t.title, t.message, t.data);
+              // Notification en app uniquement (pas d'email automatique hors validation)
+              NotificationService.broadcast(t.type, t.title, t.message, {
+                ...t.data,
+                skipEmailMirror: true,
+              });
             } catch (_) {}
           }
 
@@ -495,11 +497,12 @@ router.put(
             // Flag team change for later template rendering
             (res as any).teamChanged = true;
 
+            // Notification en app uniquement (pas d'email automatique hors validation)
             NotificationService.broadcast(
               "role_update",
-              "Modification de l'��quipe",
+              "Modification de l'équipe",
               changed.join(", "),
-              { daoId: updated.id, changes: changed },
+              { daoId: updated.id, changes: changed, skipEmailMirror: true },
             );
           }
         }
@@ -565,7 +568,17 @@ router.put(
 
         if (changedKeys.size > 0 || !hasTaskChanges) {
           const t = tplDaoUpdated(updated, changedKeys);
-          NotificationService.broadcast(t.type, t.title, t.message, t.data);
+          // Enregistrer ces changements pour la validation (email côté "Valider")
+          try {
+            if (changedKeys.size > 0) {
+              DaoChangeLogService.recordDaoChanged(updated, changedKeys);
+            }
+          } catch {}
+          // Si l'équipe a changé, envoyer un email immédiat "Mise à jour d’un DAO"
+          if ((res as any).teamChanged === true) {
+            NotificationService.broadcast(t.type, t.title, t.message, t.data);
+          }
+          // Conserver l'historique
           historyPayload = {
             summary: t.title,
             lines: splitMessageLines(t.message),
@@ -979,6 +992,7 @@ router.put(
           comment: previous.comment !== task.comment ? task.comment : undefined,
         });
 
+        // Notification + email immédiat
         NotificationService.broadcast(
           notif.type,
           notif.title,
@@ -1061,8 +1075,19 @@ router.post(
       const { summary, history } = aggregated;
 
       try {
-        const t = tplDaoAggregatedUpdate({ dao, lines: summary.lines });
-        NotificationService.broadcast(t.type, t.title, t.message, t.data);
+        // Choisir UNE notification email en fonction de la nature des changements
+        if (summary.kind === "tasks") {
+          NotificationService.broadcast(
+            "task_notification",
+            "Mise à jour d’une tâche",
+            summary.lines.join("\n"),
+            { event: "task_validation", daoId: dao.id }
+          );
+        } else {
+          // top-level DAO changes
+          const t = tplDaoAggregatedUpdate({ dao, lines: summary.lines });
+          NotificationService.broadcast(t.type, t.title, t.message, t.data);
+        }
       } catch (_) {}
 
       return void res.json({ ok: true, summary, historyId: history.id });
