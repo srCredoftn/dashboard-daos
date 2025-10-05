@@ -116,44 +116,58 @@ class InMemoryDaoChangeLogService {
   buildAggregatedSummary(dao: Dao, maxLines = 6): DaoAggregatedSummary | null {
     const p = this.pending.get(dao.id);
     const createdAt = new Date().toISOString();
-    if (!p || p.tasks.size === 0) {
-      return null;
+    if (!p) return null;
+
+    // Cas 1: changements de tâches → "Mise à jour d’une tâche"
+    if (p.tasks.size > 0) {
+      const entries = Array.from(p.tasks.values()).sort(
+        (a, b) => a.taskId - b.taskId,
+      );
+      const lines: string[] = [];
+      lines.push(`Numéro de liste : ${dao.numeroListe}`);
+      let count = 0;
+      for (const item of entries) {
+        if (count >= maxLines) break;
+        const parts: string[] = [];
+        parts.push(`Tâche ${item.taskId} :`);
+        if (typeof item.isApplicable === "boolean")
+          parts.push(`Applicabilité : ${item.isApplicable ? "Oui" : "Non"}`);
+        if (item.isApplicable && typeof item.progress === "number")
+          parts.push(`Progression : ${item.progress}%`);
+        if (item.comment && item.comment.trim())
+          parts.push(`Commentaire: "${item.comment.trim()}"`);
+        lines.push(parts.join(" "));
+        count++;
+      }
+      if (entries.length > maxLines) lines.push("(...)");
+      const message = lines.join("\n");
+      return {
+        daoId: dao.id,
+        numeroListe: dao.numeroListe,
+        title: "Mise à jour d’une tâche",
+        message,
+        lines,
+        createdAt,
+        kind: "tasks",
+      };
     }
 
-    // Ordonner par taskId pour une sortie stable
-    const entries = Array.from(p.tasks.values()).sort(
-      (a, b) => a.taskId - b.taskId,
-    );
-    const lines: string[] = [];
-    lines.push(`Numéro de liste : ${dao.numeroListe}`);
-    let count = 0;
-    for (const item of entries) {
-      if (count >= maxLines) break;
-      const parts: string[] = [];
-      parts.push(`Tâche ${item.taskId} :`);
-      if (typeof item.isApplicable === "boolean")
-        parts.push(`Applicabilité : ${item.isApplicable ? "Oui" : "Non"}`);
-      if (item.isApplicable && typeof item.progress === "number")
-        parts.push(`Progression : ${item.progress}%`);
-      if (item.comment && item.comment.trim())
-        parts.push(`Commentaire: "${item.comment.trim()}"`);
-      lines.push(parts.join(" "));
-      count++;
+    // Cas 2: changements d'en-tête (DAO) → "Mise à jour d’un DAO"
+    if (p.daoChangedKeys && p.daoChangedKeys.size > 0) {
+      const tpl = tplDaoUpdated(dao, p.daoChangedKeys);
+      const lines = String(tpl.message || "").split("\n");
+      return {
+        daoId: dao.id,
+        numeroListe: dao.numeroListe,
+        title: tpl.title,
+        message: tpl.message,
+        lines,
+        createdAt,
+        kind: "dao",
+      };
     }
 
-    if (entries.length > maxLines) {
-      lines.push("(...)");
-    }
-
-    const message = lines.join("\n");
-    return {
-      daoId: dao.id,
-      numeroListe: dao.numeroListe,
-      title: "Mise à jour DAO",
-      message,
-      lines,
-      createdAt,
-    };
+    return null;
   }
 
   finalizeAndStoreHistory(summary: DaoAggregatedSummary): DaoHistoryEntry {
