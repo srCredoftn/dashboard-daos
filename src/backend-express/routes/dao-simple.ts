@@ -574,7 +574,11 @@ router.put(
               DaoChangeLogService.recordDaoChanged(updated, changedKeys);
             }
           } catch {}
-          // Pas de diffusion immédiate; conserver uniquement l'historique
+          // Si l'équipe a changé, envoyer un email immédiat "Mise à jour d’un DAO"
+          if ((res as any).teamChanged === true) {
+            NotificationService.broadcast(t.type, t.title, t.message, t.data);
+          }
+          // Conserver l'historique
           historyPayload = {
             summary: t.title,
             lines: splitMessageLines(t.message),
@@ -1013,7 +1017,7 @@ router.put(
         } catch (_) {}
       }
 
-      logger.audit("T��che mise à jour avec succès", req.user?.id, req.ip);
+      logger.audit("Tâche mise à jour avec succès", req.user?.id, req.ip);
       res.json(updated);
     } catch (error) {
       if (error instanceof z.ZodError) {
