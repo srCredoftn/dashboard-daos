@@ -171,11 +171,12 @@ class InMemoryDaoChangeLogService {
   }
 
   finalizeAndStoreHistory(summary: DaoAggregatedSummary): DaoHistoryEntry {
+    const event: DaoHistoryEventType = summary.kind === "dao" ? "dao_updated" : "dao_task_update";
     return this.recordEvent({
       dao: { id: summary.daoId, numeroListe: summary.numeroListe },
       summary: summary.title,
       lines: summary.lines,
-      eventType: "dao_task_update",
+      eventType: event,
       createdAt: summary.createdAt,
     });
   }
