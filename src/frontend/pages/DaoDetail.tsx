@@ -1401,11 +1401,11 @@ export default function DaoDetail() {
               {canValidate && (
                 <Button
                   size="sm"
-                  className="w-full xs:w-auto lg:w-28"
+                  className="w-36"
                   onClick={handleValidateClick}
                   disabled={isValidating}
                 >
-                  <Check className="h-4 w-4 mr-2" />
+                  <Check className="h-4 w-4 mr-1" />
                   {isValidating ? "Validation…" : "Valider"}
                 </Button>
               )}
@@ -1416,11 +1416,11 @@ export default function DaoDetail() {
             <div className="mt-8 flex justify-center">
               <Button
                 size="sm"
-                className="w-full xs:w-auto lg:w-28"
+                className="w-36"
                 onClick={handleValidateClick}
                 disabled={isValidating}
               >
-                <Check className="h-4 w-4 mr-2" />
+                <Check className="h-4 w-4 mr-1" />
                 {isValidating ? "Validation…" : "Valider"}
               </Button>
             </div>
