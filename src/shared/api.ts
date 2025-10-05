@@ -45,8 +45,9 @@ export interface DaoHistoryEntry {
 export interface DaoAggregatedSummary {
   daoId: string;
   numeroListe: string;
-  title: string; // "Mise à jour DAO"
+  title: string; // "Mise à jour DAO" ou "Mise à jour d’une tâche"
   message: string; // corps prêt pour notification/email
   lines: string[]; // lignes utilisées pour le message
   createdAt: string; // ISO
+  kind?: "tasks" | "dao"; // nature des changements agrégés
 }
