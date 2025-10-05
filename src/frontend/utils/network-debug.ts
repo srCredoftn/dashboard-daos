@@ -142,10 +142,7 @@ class NetworkDiagnostics {
       error: lastError || "Erreur inconnue",
     });
 
-    console.error(
-      "❌ Échec de vérification de la connectivité au backend :",
-      lastError,
-    );
+    console.warn("❌ Échec de vérification de la connectivité au backend:", lastError);
     return false;
   }
 
