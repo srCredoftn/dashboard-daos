@@ -24,6 +24,7 @@ interface PendingByDao {
   daoId: string;
   numeroListe: string;
   tasks: Map<number, PendingTaskChange>; // taskId -> latest state snapshot for fields of interest
+  daoChangedKeys?: Set<string>; // clés de haut de page modifiées en attente
   lastTouchedAt: string; // ISO
 }
 
