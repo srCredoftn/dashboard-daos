@@ -125,12 +125,13 @@ class NetworkDiagnostics {
         console.warn(`⚠️ Backend returned ${response?.status} for ${target}`);
       } catch (error) {
         const errMsg = error instanceof Error ? error.message : String(error);
+        const lower = errMsg.toLowerCase();
         const friendly =
-          errMsg.includes("AbortError") || errMsg.includes("aborted")
+          (error as any)?.name === "AbortError" || lower.includes("aborted") || lower.includes("abort") || lower.includes("timeout")
             ? "Délai d’attente dépassé"
             : errMsg;
         lastError = friendly;
-        console.warn(`⚠️ Tentative vers ${target} échouée :`, friendly);
+        console.warn(`⚠️ Tentative vers ${target} échouée : ${friendly}`);
       }
     }
 
