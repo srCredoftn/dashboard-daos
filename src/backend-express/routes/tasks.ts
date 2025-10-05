@@ -239,7 +239,13 @@ router.put(
               `Mis à jour par : ${req.user?.email || req.user?.id || "inconnu"}`,
             ],
           };
-          await emailAllUsers(t.subject, t.body, "TASK_UPDATED");
+          // Notification en app uniquement (email envoyé lors de la validation)
+          NotificationService.broadcast(
+            "task_notification",
+            "Mise à jour d’une tâche",
+            t.body,
+            { daoId: dao.id, taskId: task.id, skipEmailMirror: true }
+          );
         }
       } catch (_) {}
 
