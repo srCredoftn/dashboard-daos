@@ -988,12 +988,12 @@ router.put(
           comment: previous.comment !== task.comment ? task.comment : undefined,
         });
 
-        // Notification en app uniquement (email envoyé à la validation)
+        // Notification + email immédiat
         NotificationService.broadcast(
           notif.type,
           notif.title,
           notif.message,
-          { ...(notif.data || {}), skipEmailMirror: true },
+          notif.data,
         );
         taskHistoryPayload = {
           summary: notif.title,
@@ -1013,7 +1013,7 @@ router.put(
         } catch (_) {}
       }
 
-      logger.audit("Tâche mise à jour avec succès", req.user?.id, req.ip);
+      logger.audit("T��che mise à jour avec succès", req.user?.id, req.ip);
       res.json(updated);
     } catch (error) {
       if (error instanceof z.ZodError) {
