@@ -568,7 +568,13 @@ router.put(
 
         if (changedKeys.size > 0 || !hasTaskChanges) {
           const t = tplDaoUpdated(updated, changedKeys);
-          // Ne plus diffuser de notification "Mise à jour DAO" ; conserver uniquement l'historique
+          // Enregistrer ces changements pour la validation (email côté "Valider")
+          try {
+            if (changedKeys.size > 0) {
+              DaoChangeLogService.recordDaoChanged(updated, changedKeys);
+            }
+          } catch {}
+          // Pas de diffusion immédiate; conserver uniquement l'historique
           historyPayload = {
             summary: t.title,
             lines: splitMessageLines(t.message),
@@ -1065,16 +1071,19 @@ router.post(
       const { summary, history } = aggregated;
 
       try {
-        // 1) Diffuser "Mise à jour DAO" (email à tous)
-        const t = tplDaoAggregatedUpdate({ dao, lines: summary.lines });
-        NotificationService.broadcast(t.type, t.title, t.message, t.data);
-        // 2) Diffuser aussi une notification de type tâche (email à tous)
-        NotificationService.broadcast(
-          "task_notification",
-          "Mise à jour d’une tâche",
-          summary.lines.join("\n"),
-          { event: "task_validation", daoId: dao.id }
-        );
+        // Choisir UNE notification email en fonction de la nature des changements
+        if (summary.kind === "tasks") {
+          NotificationService.broadcast(
+            "task_notification",
+            "Mise à jour d’une tâche",
+            summary.lines.join("\n"),
+            { event: "task_validation", daoId: dao.id }
+          );
+        } else {
+          // top-level DAO changes
+          const t = tplDaoAggregatedUpdate({ dao, lines: summary.lines });
+          NotificationService.broadcast(t.type, t.title, t.message, t.data);
+        }
       } catch (_) {}
 
       return void res.json({ ok: true, summary, historyId: history.id });
