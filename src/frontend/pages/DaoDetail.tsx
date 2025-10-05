@@ -1401,6 +1401,7 @@ export default function DaoDetail() {
               {canValidate && (
                 <Button
                   size="sm"
+                  className="w-full xs:w-auto lg:w-28"
                   onClick={handleValidateClick}
                   disabled={isValidating}
                 >
@@ -1415,6 +1416,7 @@ export default function DaoDetail() {
             <div className="mt-8 flex justify-center">
               <Button
                 size="sm"
+                className="w-full xs:w-auto lg:w-28"
                 onClick={handleValidateClick}
                 disabled={isValidating}
               >
